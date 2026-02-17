@@ -1,0 +1,1 @@
+Used in ~/.claude/skills to help claude code drill deeper into the code, analyze it on many levels, and proved more detailed feedback.

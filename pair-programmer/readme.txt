@@ -1,0 +1,1 @@
+Used in ~/.codex/skills to make codex more chill and less autistic. 

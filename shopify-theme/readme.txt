@@ -1,0 +1,1 @@
+Used in ~/.claude/skills to help claude code develop new sections and snippets in my Shopify theme in the format that I like to code in.

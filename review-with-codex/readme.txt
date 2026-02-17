@@ -1,0 +1,1 @@
+Used in ~/.claude/skills to help claude code review plans or code with codex directly in the claude code session and integrate feedback into the plan. Tells claude to ignore when codex want to over-engineer stuff. 
