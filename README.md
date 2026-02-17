@@ -19,6 +19,24 @@ Download or clone this repo, then copy the skill folders you want into your skil
 
 Skills are picked up automatically — no config changes needed.
 
+### Usage
+
+**Claude Code** — skills show up as slash commands:
+
+```
+/pair-programmer
+/code-review
+/shopify-theme
+```
+
+**Codex CLI** — skills use dollar sign syntax:
+
+```
+$pair-programmer
+$code-review
+$shopify-theme
+```
+
 ---
 
 ## Skills
