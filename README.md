@@ -12,43 +12,12 @@ Skills are modular instruction sets that change how your AI assistant thinks, wr
 
 ## Installation
 
-### Claude Code
+Download or clone this repo, then copy the skill folders you want into your skills directory:
 
-Clone this repo into your Claude Code skills directory:
+- **Claude Code:** `~/.claude/skills/`
+- **Codex CLI:** `~/.codex/skills/`
 
-```bash
-# Remove the default skills folder if it exists
-rm -rf ~/.claude/skills
-
-# Clone directly into the skills path
-git clone https://github.com/CorySchulz/skills.git ~/.claude/skills
-```
-
-Skills are picked up automatically — no config changes needed. Claude Code reads the `SKILL.md` files and triggers them based on what you're working on.
-
-### Codex CLI
-
-Clone this repo into your Codex skills directory:
-
-```bash
-# Remove the default skills folder if it exists (back up first if you have custom skills)
-rm -rf ~/.codex/skills
-
-# Clone directly into the skills path
-git clone https://github.com/CorySchulz/skills.git ~/.codex/skills
-```
-
-Codex reads `SKILL.md` frontmatter to decide when to activate each skill.
-
-### Cherry-pick individual skills
-
-If you only want specific skills, copy the folders you need:
-
-```bash
-# Example: just grab pair-programmer and code-review
-cp -r pair-programmer ~/.claude/skills/
-cp -r code-review ~/.claude/skills/
-```
+Skills are picked up automatically — no config changes needed.
 
 ---
 
@@ -56,9 +25,7 @@ cp -r code-review ~/.claude/skills/
 
 ### pair-programmer
 
-**Works with:** Claude Code, Codex CLI
-
-The anti-corporate personality. Turns your AI into a chill pair programming partner instead of a corporate assistant. It will:
+Built to make GPT Codex a better programming partner and less of a dry, corporate assistant. Works with Claude Code too — but honestly, Claude already has most of this swag naturally.
 
 - Talk like a real person, not a help desk
 - Have actual opinions instead of listing 5 options and saying "it depends"
