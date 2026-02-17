@@ -168,6 +168,64 @@ Follow this skeleton for every new section:
 
 ---
 
+## 2b. Section Padding Pattern
+
+Sections use `py-section` (or `pt-section` / `pb-section`) for vertical padding. When adding optional padding removal, **always build the class string in the Liquid logic block at the top** — never use inline `{% unless %}` logic inside HTML class attributes.
+
+**DO THIS** — clean, readable:
+
+```liquid
+{%- liquid
+  assign s = section.settings
+
+  assign padding_class = ''
+  unless s.remove_top_padding
+    assign padding_class = 'pt-section'
+  endunless
+  unless s.remove_bottom_padding
+    assign padding_class = padding_class | append: ' pb-section'
+  endunless
+-%}
+
+<section class="color-{{ s.color_scheme }}">
+  <div class="{{ padding_class }}">
+    ...
+  </div>
+</section>
+```
+
+**DON'T DO THIS** — inline conditional logic in class attributes is ugly and hard to read:
+
+```liquid
+{%- # BAD — don't do this -%}
+<div class="{% unless s.remove_top_padding %}pt-section{% endunless %} {% unless s.remove_bottom_padding %}pb-section{% endunless %}">
+```
+
+**Schema settings:**
+
+```json
+{
+  "type": "header",
+  "content": "Section padding"
+},
+{
+  "type": "checkbox",
+  "id": "remove_top_padding",
+  "label": "Remove top padding",
+  "default": false
+},
+{
+  "type": "checkbox",
+  "id": "remove_bottom_padding",
+  "label": "Remove bottom padding",
+  "default": false
+}
+```
+
+This pattern applies generally: keep conditional class-building logic in the `{%- liquid %}` block at the top of the section, then output clean `{{ variable }}` references in the HTML.
+
+---
+
 ## 3. Snippet Anatomy
 
 Snippets use a `{% doc %}` block instead of a schema:
