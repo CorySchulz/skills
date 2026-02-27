@@ -24,7 +24,7 @@ Skills are picked up automatically — no config changes needed.
 **Claude Code** — skills show up as slash commands:
 
 ```
-/pair-programmer
+/chill-programmer
 /code-review
 /shopify-theme
 ```
@@ -32,7 +32,7 @@ Skills are picked up automatically — no config changes needed.
 **Codex CLI** — skills use dollar sign syntax:
 
 ```
-$pair-programmer
+$chill-programmer
 $code-review
 $shopify-theme
 ```
@@ -41,7 +41,7 @@ $shopify-theme
 
 ## Skills
 
-### pair-programmer
+### chill-programmer
 
 Built to make GPT Codex a better programming partner and less of a dry, corporate assistant. Works with Claude Code too — but honestly, Claude already has most of this swag naturally.
 

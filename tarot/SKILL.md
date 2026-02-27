@@ -67,7 +67,7 @@ All options with defaults. Pass via `<script type="application/json" data-tarot-
 | `effect` | string | `'carousel'` | Visual effect (see §3) |
 | `loop` | boolean | `false` | Infinite looping |
 | `slidesPerView` | number | `1` | Visible slides |
-| `slidesPerMove` | number | `1` | Slides moved per nav action |
+| `slidesPerMove` | number\|string | `'auto'` | Slides moved per nav action (`'auto'` = match `slidesPerView`, floored) |
 | `gap` | number\|string | `0` | Space between slides (`16` or `'16px'`) |
 | `paddingLeft` | number\|string | `0` | Left viewport padding |
 | `paddingRight` | number\|string | `0` | Right viewport padding |
