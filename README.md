@@ -62,9 +62,7 @@ Core personality and communication style that layers on top of everything else. 
 
 ### review-with-codex
 
-**Works with:** Claude Code only
-
-Sends your current plan to Codex CLI for a second opinion, then integrates the feedback. Writes the plan to a temp file, runs it through `codex exec` in read-only mode, filters out the over-engineering tendencies, and incorporates the genuinely useful feedback into an updated plan.
+Designed for Claude Code to communicate with Codex CLI. Sends your current plan to Codex for a second opinion, then integrates the feedback. Writes the plan to a temp file, runs it through `codex exec` in read-only mode, filters out the over-engineering tendencies, and incorporates the genuinely useful feedback into an updated plan. Assumes Codex CLI is installed with an active account and subscription.
 
 **Trigger:** Say "review this with codex" or ask for a "second opinion"
 
