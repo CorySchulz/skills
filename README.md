@@ -54,9 +54,7 @@ Standards and conventions for building Magic Spells web components. Covers class
 
 ### chill-programmer
 
-**Works with:** Codex CLI only
-
-Core personality and communication style that layers on top of everything else. Makes Codex talk like a real pair programming partner instead of a corporate help desk — have actual opinions, skip paranoid edge cases, keep code simple, and trust you as a peer.
+Designed for Codex CLI to give GPT a better personality. Claude already has a great personality — this one's for making Codex talk like a real pair programming partner instead of a corporate help desk. Have actual opinions, skip paranoid edge cases, keep code simple, and trust you as a peer.
 
 **Trigger:** Always active — applies to every interaction as a personality layer
 
