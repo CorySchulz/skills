@@ -156,7 +156,22 @@ Min-width keys. Options merge non-cumulatively (each breakpoint is independent):
 | Effect | Import | Notes |
 |---|---|---|
 | `carousel` | Built-in | Standard horizontal slide. No restrictions. |
-| `fade` | Built-in | Cross-fade. Forces `slidesPerView: 1`. Options: `fadeBlur` (default 10), `fadeScale` (default 0.1). |
+| `fade` | Built-in | Cross-fade. Forces `slidesPerView: 1`. See fade options below. |
+
+#### Fade Options
+
+Pass under a `fade` key:
+
+```json
+{ "effect": "fade", "fade": { "blur": 10, "scale": 0.1, "xOffset": 0, "yOffset": 0 } }
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `fade.blur` | number | `10` | Blur filter on off-screen slides (px) |
+| `fade.scale` | number | `0.1` | Scale offset on off-screen slides (0.1 → `scale(1.1)`) |
+| `fade.xOffset` | number | `0` | Horizontal translate offset (px) |
+| `fade.yOffset` | number | `0` | Vertical translate offset (px) |
 | `ripple` | `scripts/packages/ripple.js` | Wave with perspective. Sets padding to 0. Best for image galleries. |
 | `spotlight` | `scripts/packages/spotlight.js` | Center slide highlighted, sides dimmed/blurred. |
 | `sliding-window` | `scripts/packages/sliding-window.js` | Window-like depth effect. Forces `slidesPerView: 1`. |

@@ -1,0 +1,1 @@
+Conventions and patterns for Magic Spells web component development.
