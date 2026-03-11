@@ -26,6 +26,7 @@ Skills are picked up automatically — no config changes needed.
 ```
 /code-review
 /web-components
+/review-with-codex
 ```
 
 **Codex CLI** — skills use dollar sign syntax:
@@ -33,7 +34,6 @@ Skills are picked up automatically — no config changes needed.
 ```
 $chill-programmer
 $code-review
-$review-with-codex
 ```
 
 ---
