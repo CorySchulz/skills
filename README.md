@@ -24,9 +24,8 @@ Skills are picked up automatically — no config changes needed.
 **Claude Code** — skills show up as slash commands:
 
 ```
-/chill-programmer
 /code-review
-/shopify-theme
+/web-components
 ```
 
 **Codex CLI** — skills use dollar sign syntax:
@@ -34,31 +33,32 @@ Skills are picked up automatically — no config changes needed.
 ```
 $chill-programmer
 $code-review
-$shopify-theme
+$review-with-codex
 ```
 
 ---
 
 ## Skills
 
-### chill-programmer
-
-Core personality and communication style that layers on top of everything else. Makes your AI assistant talk like a real pair programming partner instead of a corporate help desk.
-
-- Talk like a real person, not a help desk
-- Have actual opinions instead of listing 5 options and saying "it depends"
-- Skip paranoid edge cases that will never happen
-- Keep code simple and elegant — no over-engineering
-- Celebrate wins and keep the energy up
-- Trust you as a peer, not lecture you as a student
-
-**Trigger:** Always active — applies to every interaction as a personality layer
-
 ### code-review
 
 Structured, three-layer code review that actually finds real issues. Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity (Critical / Important / Minor / Nit). Focuses on bugs that will actually bite you, not stylistic nitpicks.
 
 **Trigger:** Ask for a "code review", say "review this code", "check for bugs", or ask for architectural feedback
+
+### web-components
+
+Standards and conventions for building Magic Spells web components. Covers class structure (`queryDOM()`, `attachListeners()`, handler patterns), naming conventions, CSS patterns (custom properties, tag-name selectors, attribute selectors for state — no SCSS, no BEM), event naming (`component-name:event` namespace), light DOM communication, the element hierarchy pattern (root, trigger, panel, option, divider, label), accessibility requirements (WAI-ARIA, keyboard nav), and form integration.
+
+**Trigger:** Creating, modifying, or reviewing any custom element in the `@magic-spells` ecosystem
+
+### chill-programmer
+
+**Works with:** Codex CLI only
+
+Core personality and communication style that layers on top of everything else. Makes Codex talk like a real pair programming partner instead of a corporate help desk — have actual opinions, skip paranoid edge cases, keep code simple, and trust you as a peer.
+
+**Trigger:** Always active — applies to every interaction as a personality layer
 
 ### review-with-codex
 
@@ -67,12 +67,6 @@ Structured, three-layer code review that actually finds real issues. Reviews in 
 Sends your current plan to Codex CLI for a second opinion, then integrates the feedback. Writes the plan to a temp file, runs it through `codex exec` in read-only mode, filters out the over-engineering tendencies, and incorporates the genuinely useful feedback into an updated plan.
 
 **Trigger:** Say "review this with codex" or ask for a "second opinion"
-
-### web-components
-
-Standards and conventions for building Magic Spells web components. Covers class structure (`queryDOM()`, `attachListeners()`, handler patterns), naming conventions, CSS patterns (custom properties, tag-name selectors, attribute selectors for state — no SCSS, no BEM), event naming (`component-name:event` namespace), light DOM communication, the element hierarchy pattern (root, trigger, panel, option, divider, label), accessibility requirements (WAI-ARIA, keyboard nav), and form integration.
-
-**Trigger:** Creating, modifying, or reviewing any custom element in the `@magic-spells` ecosystem
 
 ---
 
