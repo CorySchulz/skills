@@ -43,7 +43,7 @@ $shopify-theme
 
 ### chill-programmer
 
-Built to make GPT Codex a better programming partner and less of a dry, corporate assistant. Works with Claude Code too — but honestly, Claude already has most of this swag naturally.
+Core personality and communication style that layers on top of everything else. Makes your AI assistant talk like a real pair programming partner instead of a corporate help desk.
 
 - Talk like a real person, not a help desk
 - Have actual opinions instead of listing 5 options and saying "it depends"
@@ -52,42 +52,27 @@ Built to make GPT Codex a better programming partner and less of a dry, corporat
 - Celebrate wins and keep the energy up
 - Trust you as a peer, not lecture you as a student
 
+**Trigger:** Always active — applies to every interaction as a personality layer
+
 ### code-review
 
-**Works with:** Claude Code, Codex CLI
+Structured, three-layer code review that actually finds real issues. Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity (Critical / Important / Minor / Nit). Focuses on bugs that will actually bite you, not stylistic nitpicks.
 
-Deep, multi-layered code review that actually finds real issues. Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity. Focuses on bugs that will actually bite you, not stylistic nitpicks.
-
-**Trigger:** Ask for a "code review", say "review this code", or "check for bugs"
+**Trigger:** Ask for a "code review", say "review this code", "check for bugs", or ask for architectural feedback
 
 ### review-with-codex
 
-**Works with:** Claude Code
+**Works with:** Claude Code only
 
-Sends your current plan to Codex CLI for a second opinion, then integrates the feedback. Useful for getting a sanity check from a different model before committing to an approach. Automatically filters out Codex's tendency to over-engineer everything.
+Sends your current plan to Codex CLI for a second opinion, then integrates the feedback. Writes the plan to a temp file, runs it through `codex exec` in read-only mode, filters out the over-engineering tendencies, and incorporates the genuinely useful feedback into an updated plan.
 
 **Trigger:** Say "review this with codex" or ask for a "second opinion"
 
-### shopify-theme
+### web-components
 
-**Works with:** Claude Code, Codex CLI
+Standards and conventions for building Magic Spells web components. Covers class structure (`queryDOM()`, `attachListeners()`, handler patterns), naming conventions, CSS patterns (custom properties, tag-name selectors, attribute selectors for state — no SCSS, no BEM), event naming (`component-name:event` namespace), light DOM communication, the element hierarchy pattern (root, trigger, panel, option, divider, label), accessibility requirements (WAI-ARIA, keyboard nav), and form integration.
 
-Complete guide for developing Shopify Liquid sections, snippets, and templates in the Luna theme framework. Covers section anatomy, image rendering, button patterns, color schemes, data-attribute system, web components, and Tailwind utilities.
-
-Includes reference files for:
-- Custom Tailwind utilities and spacing
-- Tarot carousel configuration
-- Magic Spells web component patterns
-
-**Trigger:** "Create a section", "build a snippet", "edit a Liquid file", or any Shopify theme work
-
-### tarot
-
-**Works with:** Claude Code, Codex CLI
-
-Full reference for the Tarot carousel web component system. Covers HTML structure, all configuration options, available effects (carousel, fade, ripple, spotlight, sliding-window), JavaScript API, events, and responsive breakpoints.
-
-**Trigger:** "Add a carousel", "carousel options", "carousel effect", or any carousel-related work
+**Trigger:** Creating, modifying, or reviewing any custom element in the `@magic-spells` ecosystem
 
 ---
 
