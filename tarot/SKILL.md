@@ -52,7 +52,9 @@ Place buttons inside `<tarot-carousel>` with these data attributes — the carou
 
 Pagination dots use `data-action-tarot-go-to-page`.
 
-Alternatively, use `navigation.previousButtonSelector` / `navigation.nextButtonSelector` options to point at buttons anywhere in the DOM.
+Alternatively, use `navigation.previousButtonSelector` / `navigation.nextButtonSelector` options to link to buttons **outside** the `<tarot-carousel>` element (e.g. buttons in a section header). If selectors are not provided, the carousel auto-generates its own buttons.
+
+> **Important:** `showButtons` controls visibility of navigation buttons regardless of how they were identified — auto-generated or linked via selectors. You must keep `showButtons: true` for custom selector-targeted buttons to remain visible.
 
 ---
 
@@ -99,6 +101,10 @@ All options with defaults. Pass via `<script type="application/json" data-tarot-
   }
 }
 ```
+
+- `showButtons` — master visibility toggle for all nav buttons (auto-generated **and** selector-targeted). Set `false` to hide them all.
+- `previousButtonSelector` / `nextButtonSelector` — CSS selectors pointing to buttons outside `<tarot-carousel>`. When provided, the carousel binds to those external elements instead of generating its own. When `false`, the carousel auto-generates buttons inside the component.
+- `showPagination` / `paginationSelector` — same pattern: `showPagination` toggles visibility, `paginationSelector` links to an external element.
 
 ### Animation
 
