@@ -24,7 +24,7 @@ Skills are picked up automatically — no config changes needed.
 **Claude Code** — skills show up as slash commands:
 
 ```
-/code-review
+/deep-review
 /web-components
 /review-with-codex
 ```
@@ -33,16 +33,16 @@ Skills are picked up automatically — no config changes needed.
 
 ```
 $chill-programmer
-$code-review
+$deep-review
 ```
 
 ---
 
 ## Skills
 
-### code-review
+### deep-review
 
-Structured, three-layer code review that actually finds real issues. Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity (Critical / Important / Minor / Nit). Focuses on bugs that will actually bite you, not stylistic nitpicks.
+Structured, three-layer code review that actually finds real issues. (Formerly named `code-review` — renamed to avoid shadowing Claude Code's built-in `/code-review` command.) Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity (Critical / Important / Minor / Nit). Focuses on bugs that will actually bite you, not stylistic nitpicks.
 
 **Trigger:** Ask for a "code review", say "review this code", "check for bugs", or ask for architectural feedback
 

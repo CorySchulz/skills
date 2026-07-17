@@ -121,6 +121,35 @@ how to find gaps and recommend tastefully — is in [`methodology.md`](./methodo
 which also backs the `bootstrap_plan` / `audit_plan` MCP prompts.** Read it before a large
 pass.
 
+**Orchestrate a large build.** For a non-trivial plan, after the macro pass act as the **orchestrator**: split the work into independent neighborhoods (the data, the user, the edges) and fan out a sub-agent per neighborhood in parallel — assign each card to exactly one agent (one handle = one file, so this also keeps writes to disjoint plan files and concurrent `update_card`s can't clobber), partition the research on area/file boundaries, and have them return card specs you write via batched `create_cards`/`add_connections`, then verify each agent's work and lint once. A single agent for a small plan — don't over-engineer.
+
+## Changing code: plan-first
+
+When the user asks to build a feature or change behavior in an area the plan covers, the
+plan **is** the spec — so do **not** edit code first. The plan you make leads with
+Constellation:
+
+1. **Read the neighborhood** — `get_card` / `traverse` / `search` (`connected: "full"`) the
+   cards the change touches, so you work from the real architecture, not a guess.
+2. **Express the end state in the plan** — add or update the cards (and `plan.md`) so they
+   describe what you're about to build, wiring every connection between the affected cards.
+   Work that doesn't exist yet is `status: planned` — honest intent, not a claim it's built.
+3. **Get sign-off on the plan diff** — show the user that set of card changes as the
+   proposal (`git diff -- constellation/` is the diff). The plan is what they approve.
+4. **Then bring the code up to match** — via the sync loop below.
+5. **Reconcile at the end** — re-read the touched cards against the code, run
+   `check_integrity` to confirm no affected card is left an orphan and every intended
+   connection is set, bump `status` (`planned → building → built → verified`), commit, and
+   `set_sync_point`.
+
+**In plan mode, read as much of the plan as you can.** The write tools are unavailable there
+by design (the read tools — `get_card`, `list_cards`, `search`, `traverse`, `describe_type`,
+`check_integrity`, `diff_plan`, `plan_log` — are marked read-only and stay available). Spend
+plan mode pulling the relevant plan into context — `traverse` from the entry points with
+`connected: "full"` — to build a strong model of the project fast, and fold the card edits
+you intend into the plan you present. Execute those Constellation writes first, before any
+code, once the user approves.
+
 ## Syncing the plan to code
 
 The plan is the source of truth: you change behavior by editing the **plan first**, then
@@ -151,6 +180,42 @@ hold the macro view of the whole change rather than drowning in file-level edits
 change against the cards it was meant to satisfy and run the project's build/tests; never
 trust the sub-agents' reports alone. Only after that whole-plan verification passes do you
 commit and `set_sync_point` (once, as the orchestrator).
+
+## Connected repos (multi-repo work)
+
+One change often spans several sibling repos (e.g. `pyramid-web`, `pyramid-server`,
+`pyramid-mcp`). Constellation models this with **repo-level links**, not cross-repo card
+connections: each project lists its siblings in `PLAN-PROJECT` frontmatter, and every plan
+stays self-contained and lints on its own.
+
+```yaml
+# plan.md (PLAN-PROJECT) frontmatter
+connected_repos:
+  - name: pyramid-server          # the `repo` selector value (lowercase id)
+    path: ../pyramid-server       # relative to this repo's root
+    description: Back-end API for Pyramid, written in Go.
+```
+
+- **Declare** links with `add_connected_repo` (`reciprocate: true` also writes the reverse
+  link into the other repo — only with the user's OK, since it edits that repo). List them
+  with `list_connected_repos` or `constellation repos`; remove with `remove_connected_repo`.
+  Paths are local topology — a missing path is never a lint error, just "not reachable here."
+- **Target** a connected repo by passing `repo: "<name>"` to any read or write tool
+  (`get_card`, `search`, `traverse`, `update_card`, `create_card`, `set_sync_point`, …); it
+  reads/writes THAT repo's plan. Omit `repo` for the current one — single-repo work is
+  unchanged.
+- **Answer cross-repo questions two ways.** For "what does the back end's plan say," read it
+  in-process with `repo:`. For "how does the back end actually work" — real code, or the
+  connected plan can't answer — spawn a **sub-agent scoped to that repo's path** to
+  investigate and report back, and if its plan had the gap, have it fill the gap.
+- **One change across repos:** examine each repo's affected area (`repo:` reads), write the
+  per-repo card updates with `repo:` set on **every** write (never omit it cross-repo, or the
+  write lands in the wrong repo), then fan out a per-repo implementer sub-agent — each runs
+  in plain single-repo mode inside its repo, blind to the others — and reconcile +
+  `set_sync_point` per repo.
+
+Cards never connect across repos; the relationship between repos lives in the
+`connected_repos` links and in your reasoning, not in card connections.
 
 ## Workflow
 

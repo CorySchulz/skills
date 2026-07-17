@@ -74,6 +74,9 @@ files and trace the data paths; never judge a system from filenames or folder st
 - Give `PLAN-PROJECT` a human-readable `name:` (folder `pyramid-server` → `Pyramid Server`).
   `init_plan` seeds a title-cased default; propose it, confirm with the user, and refine it.
   It's the viewer's title and is editable anytime (`update_card` on `PLAN-PROJECT`).
+- If this repo is one of several that change together, declare its siblings with
+  `add_connected_repo` — repo-level links, not cross-repo card connections. See *Connected
+  repos* in `SKILL.md` for the multi-repo workflow.
 
 ## Step 1 — Macro pass (zoom out)
 
@@ -83,6 +86,14 @@ Make one card per major thing, shallow, before detailing anything:
 - Don't write bodies yet beyond a sentence. The goal is the skeleton and its connections,
   not prose. Use `create_cards` + `add_connections` (batched — one lint pass, intra-batch
   refs resolve) rather than many single writes.
+
+Once the skeleton stands, **orchestrate the detail for a non-trivial plan.** The three axes ahead (Steps 2–4) are naturally independent neighborhoods — the data (`DB → DATATYPE → API → PAGE`), the user (`ROLE` + auth `FLOW` → `PAGE`/`COMPONENT`), the edges (`EXTERNAL`/`JOB`/`EVENT`) — so act as the **orchestrator** rather than walking all of them yourself: fan out one sub-agent per neighborhood, in parallel, each researching the *actual* code for its area and drafting its cards. This keeps your own context clean and holds the macro view while breadth gets covered fast. A few rules make the writes safe:
+
+- **One owner per card.** Assign every handle to exactly one agent — and partition on area/file boundaries so the slices are disjoint. Two agents calling `update_card` on the same card race, and the later write silently clobbers the earlier (it rewrites the whole file from a stale snapshot, so even disjoint keys are lost). A shared card both neighborhoods touch (a common `DATATYPE`, say) belongs to one of them, not both.
+- **Prefer return-specs over parallel writes.** Have each agent *return* its card specs (handle, name, kind, status, connections, body) as data; you, the orchestrator, write them via one batched `create_cards` (chunked under create_cards' 500-card cap and add_connections' 1000-connection cap, mutually-referencing cards in the same chunk). Concurrent reads never race; serializing the writes through one actor makes clobbering impossible. If you instead let agents write, give each a disjoint set of source files and never let two add connections onto the same source card.
+- **Wire and verify once, centrally.** Connections are undirected — declare each on a single side. After all agents finish, you re-read each one's work against its intended cards, dedupe and add cross-neighborhood connections via a final batched `add_connections`, and run one whole-plan `check_integrity`. Never trust the agents' per-write issues as proof of final state.
+
+Use a single agent — no fan-out — when the plan is small or the areas overlap; the coordination only pays off when neighborhoods are genuinely independent. Don't over-engineer the process either.
 
 ## Step 2 — Follow the data
 
@@ -209,3 +220,9 @@ the smallest set of changes that most improves the plan — not the most cards.
   so no two agents edit the same file, and give each card to exactly one agent so concurrent
   `update_card`s can't clobber each other) and always verify the agents' work yourself before
   setting the marker.
+- Building something new also goes **plan-first**: don't edit code first — read the affected
+  neighborhood, express the desired end state as cards (new work as `planned`) with their
+  connections wired, get sign-off on the plan diff, then run that same code-up-to-plan loop and
+  reconcile (`check_integrity` for orphans, status bumps, `set_sync_point`). In plan mode, where
+  writes are blocked, read the plan heavily to model the project fast and present the card edits
+  you'll make. Full steps in *Changing code: plan-first* in `SKILL.md`.

@@ -1,5 +1,5 @@
 ---
-name: code-review
+name: deep-review
 description: This skill should be used when the user asks for a "code review", says "review this code", "review these changes", wants to "check for bugs", "look for issues", or asks for architectural feedback on code they've written.
 argument-hint: "[files, directories, 'recent changes', or PR number]"
 allowed-tools: Read, Grep, Glob, Task, Bash(git:*), Bash(gh:*)
