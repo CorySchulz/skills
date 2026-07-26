@@ -39,7 +39,7 @@ Match the review depth to the size of the scope. Do not run every phase at full 
 | ----- | ------ | ---------------- | ------------- | -------------------- |
 | **Small** (1–3 files, small diff) | Skip Layer 1 unless the change is itself architectural (new module, new dependency direction, new pattern). Full Layers 2 and 3. | Skip | Skip | Critical/Important only |
 | **Medium** (a feature, a directory, a substantial diff) | Brief Layer 1 scoped to the touched area; full Layers 2 and 3. | Run | C1 + C2 | All findings |
-| **Large** (full project) | All three layers at full depth. | Run | C1 + C2 + C3 | All findings |
+| **Large** (full project) | All three layers at full depth. | Run | C1 + C2, plus targeted tracing after Layer 2 | All findings |
 
 Spinning up eight agents to review one file is worse than reading it yourself — the coordination overhead buys nothing and the evidence agents have no history to find. Match the machinery to the job.
 
@@ -81,7 +81,7 @@ These agents return **cited facts, not findings**. A finding requires judgment t
 
 - **Conventions** — the root CLAUDE.md, any CLAUDE.md in directories the change touches, and lint/style config. Return the specific rules that could bear on this change, each quoted with its `file:line`. Not a summary of the file — the applicable rules, verbatim.
 - **History** — `git blame` and `git log -L` over the changed line ranges. For each touched region: when it last changed, what the commit said, and whether any prior commit was a fix. A line introduced by `fix: guard against empty batch` is a different line than one introduced by `initial commit`, and simplifying the first one is how a bug comes back.
-- **Prior review comments** — merged PRs that touched these files (`gh pr list`), and the review comments left on them. Return any that could apply again. Skip silently if there is no `gh` or no remote.
+- **Prior review comments** — **PR scopes only.** Merged PRs that touched these files (`gh pr list`), and the review comments left on them. Return any that could apply again. Don't run this on a local diff; without a PR history to search it returns nothing and costs a round trip. Skip silently if `gh` is missing.
 - **Comments as spec** — doc comments, invariant comments, and TODOs in and around the changed code. Return any that the change could contradict. A comment saying "callers must hold the lock" is a contract, and the diff either honors it or breaks it.
 
 ## Phase 2 — Execute the Review Layers
@@ -149,11 +149,12 @@ Agent(
 - `--fresh` is required. Without it, parallel Codex agents can resume into each other's thread.
 - The read-only sentence is required. The rescue subagent adds `--write` by default.
 
-Which finders to run:
+Dispatch both of these at the start of Phase 2:
 
 - **C1 — shallow diff scan.** The changed lines only, no wider context. Large, obvious bugs. Deliberately context-starved: it catches the things that deep reading talks itself out of.
 - **C2 — technical correctness**, with `--effort xhigh`. Concurrency and ordering, arithmetic and boundary conditions, resource lifecycle, state-machine and protocol correctness.
-- **C3 — exhaustive tracing**, large scopes only. Fire this after Layer 2, once you can name a concrete target: "every call site of `parseConfig`, and which ones can reach it with an absent value."
+
+On large scopes, dispatch one more after Layer 2, once you can name a concrete target: exhaustive tracing of a specific symbol — "every call site of `parseConfig`, and which of them can reach it with an absent value." This is the single best use of Codex in a review, but it only works when you can be that specific, which is why it waits for Layer 2.
 
 **Never send Codex an architecture question.** Not module boundaries, not dependency direction, not "should this be structured differently", not severity calls, not anything from Layer 1. It answers those with abstraction layers, factories, and config knobs you did not need.
 
@@ -163,7 +164,7 @@ Codex returns prose, and it is the least trusted input in this review. Normalize
 
 - Every Codex claim enters as a **candidate finding with no severity attached.** You assign severity, after verification.
 - **Strip any recommendation that adds an abstraction, indirection layer, config option, or design pattern** unless it fixes a concrete bug you can state as a failure scenario. Over-engineering is Codex's dominant failure mode. Stripping the recommendation does not discard the finding — if it found a real bug and proposed an over-built fix, keep the bug and write your own fix.
-- Codex-sourced findings require **two independent Opus verifiers**, both clearing the threshold. Claude-sourced findings require one.
+- Codex-sourced findings clear a **higher verification bar** than Claude-sourced ones — see the gate in Phase 3.
 
 ## Classify Findings by Severity and Fix Effort
 
@@ -221,12 +222,14 @@ For findings flagged on a conventions rule, the verifier must confirm the rule a
 
 Then apply the gate:
 
-| Severity | Report | Demote to Open Questions | Drop |
-| -------- | ------ | ------------------------ | ---- |
+| Finding | Report | Demote to Open Questions | Drop |
+| ------- | ------ | ------------------------ | ---- |
 | Critical / Important | ≥ 80 | 50–79 | < 50 |
+| Critical / Important, **via Codex** | ≥ 90 | 50–89 | < 50 |
 | Minor / Nit | ≥ 50 | — | < 50 |
+| Minor / Nit, **via Codex** | ≥ 70 | — | < 70 |
 
-For Codex-sourced findings, both verifiers must clear the bar. If they disagree, take the lower score.
+Codex clears a higher bar because it over-claims. One verifier, raised threshold — do not run a second verifier to compensate.
 
 A finding that fails the gate is gone. Do not downgrade its severity to sneak it back in under a lower threshold, and do not mention it in passing in the summary. Dropped means dropped.
 
