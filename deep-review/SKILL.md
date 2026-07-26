@@ -22,16 +22,14 @@ Interpret the requested scope:
 
 Skip generated and vendor artifacts by default — `dist/`, `build/`, `node_modules/`, `vendor/`, lock files, minified bundles, source maps, and generated code are not useful review targets. If a generated file is explicitly passed as an argument, review it anyway.
 
-Read the actual source code. Never form opinions from file names alone. Open each file, read it, trace the data paths.
-
-If the project has a CLAUDE.md, README, or lint/style config with architectural context or conventions, read it first to calibrate expectations — suggestions should match how this codebase already does things.
+If the project has a CLAUDE.md, README, or lint/style config with architectural context or conventions, read it first to calibrate expectations — suggestions should match how this codebase already does things. Phase 1 does this properly for larger scopes; do it yourself when Phase 1 is skipped.
 
 If a tool isn't available (no git repo, `gh` not installed, PR fetch fails), don't bail — fall back gracefully. No git? Do a path-based review. No `gh`? Ask for a local branch diff instead. Always tell the user what was skipped and why.
 
 ### Managing large scopes
 
 - 5–20 files: read them yourself in parallel batches.
-- More than ~20 files: fan the initial reading out to Sonnet subagents (one per module/directory, asking each for structure, responsibilities, and suspicious areas), then personally read the files flagged as critical. Never write findings about code you haven't read directly — subagent summaries identify where to look, not what to conclude.
+- More than ~20 files: fan the initial reading out to Sonnet subagents (one per module/directory, asking each for structure, responsibilities, and suspicious areas), then personally read the files flagged as critical.
 
 ## Calibrate Depth to Scope
 
@@ -197,14 +195,13 @@ Calibrating effort:
 
 These are the recurring false positives. Recognize them during the layers, and reject them again during verification:
 
-- **Pre-existing issues** presented as introduced. Tag them Pre-existing or leave them out.
+- **Pre-existing issues presented as introduced**, including real issues on lines the change didn't touch. Tag them Pre-existing or leave them out.
 - **Things that look like a bug but aren't** once you trace the actual call sites.
 - **Pedantic nitpicks a senior engineer wouldn't raise.** If it wouldn't survive being said out loud in a review, it doesn't go in.
 - **Anything a linter, typechecker, or compiler catches** — missing imports, type errors, formatting. If you spot one, group them into a single line with no severity. Don't spend a finding on it, and don't run the build to hunt for more.
 - **Generic quality complaints** — "needs more tests", "could use better docs" — unless the project's own conventions require it or a specific behavior in this change is untested.
 - **Rules the code explicitly silenced**, e.g. with a lint-ignore comment. That's a decision, not an oversight.
 - **Changes that are likely intentional** or that follow directly from the broader change.
-- **Real issues on lines the change didn't touch**, in a diff review. Those are Pre-existing.
 
 ## Phase 3 — Verify Every Finding
 
@@ -235,17 +232,17 @@ A finding that fails the gate is gone. Do not downgrade its severity to sneak it
 
 ## Phase 4 — Structure the Report
 
-Scale the report to the scope. For small scopes (1–3 files), keep it lean — skip the Architecture Overview and Open Questions sections if there's nothing meaningful to say; Findings and Verdict are what matter. An empty severity level is a valid result — say "no critical findings" and move on rather than padding the section.
+Only Findings, Verdict, and Summary are required. The rest are conditional — include one when it has something to say, omit it entirely when it doesn't. A section with nothing in it is worse than a missing section, because it reads as though the review looked and found nothing when it never looked. An empty severity level is fine: say "no critical findings" and move on rather than padding it.
 
-### 1. Scope Summary
+### 1. Scope Summary — conditional
 
-Two to three sentences: what was reviewed, how many files, which area of the codebase.
+Two to three sentences: what was reviewed, how many files, which area of the codebase. Skip when the user already knows (they named the files, or it's their own working diff).
 
-### 2. Architecture Overview
+### 2. Architecture Overview — conditional
 
-One paragraph describing the macro-level architecture as understood from reading the code. Establish shared context before diving into findings.
+One paragraph describing the macro-level architecture as understood from reading the code. Establish shared context before diving into findings. Skip when Layer 1 was skipped.
 
-### 3. Findings
+### 3. Findings — required
 
 Group by severity (Critical first, then Important, Minor, Nit). Within each group, order by review layer (Macro → Mid → Micro). For diff reviews, list Introduced findings first and collect Pre-existing ones under their own heading.
 
@@ -259,17 +256,15 @@ For each finding:
 - **Why it matters** — The concrete risk or consequence. When proposing a different pattern, explain what makes it better for this specific situation — not just "best practice says so."
 - **Suggested approach** — Describe the fix or improvement direction with enough detail to act on. For Needs plan findings, say what has to be decided rather than proposing an implementation.
 
-### 4. Strengths
+### 4. Strengths — conditional
 
 Call out what is done well. Good architecture, clean patterns, clever solutions, thorough edge case handling — name them explicitly. Every codebase has strengths worth recognizing.
 
-### 5. Open Questions
+### 5. Open Questions — conditional
 
 Two things land here. First, anything ambiguous during the review — intent that's unclear, behavior that could be intentional or accidental, areas where you lacked enough context to be sure. Second, the Critical and Important findings that scored 50–79 in verification: real enough to raise, not solid enough to assert. Phrase those as questions ("is `flush()` guaranteed to run before teardown here?") rather than as softened findings.
 
-This section can be empty if everything was clear and nothing was demoted.
-
-### 6. Verdict
+### 6. Verdict — required
 
 One line. For diff reviews, base it on Introduced findings only. Pick one:
 
@@ -277,11 +272,11 @@ One line. For diff reviews, base it on Introduced findings only. Pick one:
 - **Ready with fixes** — Good overall, but the critical/important findings should be addressed first.
 - **Needs rework** — Structural issues that need attention before this is mergeable.
 
-### 7. Summary
+### 7. Summary — required
 
-Three to five sentences: overall assessment, the most impactful finding, and recommended next steps.
+Three to five sentences: the most impactful finding, and what to do next. Don't restate the Verdict.
 
-Order the next steps by severity against effort, not severity alone. Critical and Important findings rated Trivial or Contained come first — they're the cheapest risk reduction available and can be done immediately. Call out anything rated **Needs plan** separately, as work that requires a decision before it requires code; folding it into the same list implies it can be knocked out alongside the quick fixes, and it can't.
+Order next steps by severity against effort, not severity alone. Critical and Important findings rated Trivial or Contained come first — the cheapest risk reduction available, doable immediately. Call out anything rated **Needs plan** separately, as work that needs a decision before it needs code; folding it into the same list implies it can be knocked out alongside the quick fixes, and it can't.
 
 ## Review Principles
 
