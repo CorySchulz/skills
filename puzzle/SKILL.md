@@ -38,10 +38,14 @@ my-app/
 
 CLI (bin `puzzle`, installed with `@magic-spells/puzzle`):
 `dev` (SSE live reload, state-preserving full-page refresh), `build` (`--static`,
-`--hybrid`, `--mode production|development`), `init`, `generate`, `add` (tailwind integration,
+`--hybrid`, `--mode production|development`), `preview` (serve an existing
+`dist/` with production-host semantics), `init`, `generate`, `add` (tailwind integration,
 `piece <name…>`, `skills`), `upgrade`, `doctor`, `info`.
 
 - `dev` and `build` both take `--fixtures` (see Fixtures below).
+- `dev` and `build` both take `--profile-build` (or `PUZZLE_PROFILE_BUILD=1`):
+  per-phase timing tables on stderr — check it before guessing why a build or
+  save feels slow.
 - A busy `--port` is not fatal: `dev` scans upward for the first free one and
   warns when it moved. `--strict-port` restores bind-or-fail.
 - `puzzle upgrade skills` refreshes the installed agent skill from the running
@@ -54,6 +58,28 @@ set `build: { dropConsole: false }` in puzzle.config.js to keep console calls.
 Linked source maps are **opt-in** in production (`build: { sourceMap: true }`);
 dev always emits them. Note that a JSON `null` means "unset" for these keys, not
 `false`.
+
+**Code splitting.** By default the SPA build emits ONE `dist/app.js` and a
+dynamic `import()` is inlined into it — a heavy on-demand dependency (mermaid, a
+chart library, an editor) is paid for on every page load. Set
+`build: { splitting: true }` and each dynamic `import()` becomes a lazy chunk
+under `dist/chunks/`, fetched by the browser only when that code path runs.
+The entry keeps its stable `app.js` name, so the shell HTML is unchanged, and
+esbuild's ESM splitting has no chunk-loader runtime, so total bytes do not grow.
+Static imports are untouched — an app with no dynamic `import()` builds to the
+same single file as before. Notes:
+
+- **`chunks/` becomes a reserved output name** while the flag is on: a
+  root-level `public/chunks` asset fails the build (as `app.js` already does).
+- `output: 'static'` ignores the flag — those pages get their own already-split
+  per-page bundles and no `app.js` ships. `hybrid` splits like the SPA.
+- The build's size banner prints a **largest-dependencies** breakdown from
+  esbuild's metafile and, in production, flags any single dependency over
+  200 KB — the signal to move it behind a dynamic `import()`. Your own code and
+  the framework itself are listed but never flagged.
+- With splitting on, vendoring a chunked ESM build as a static asset (loading it
+  through a variable URL so esbuild leaves it alone) is no longer necessary —
+  write a plain `await import('pkg')` instead.
 
 **Dev API proxy.** `dev: { proxy: { '/api': 'http://localhost:3091' } }` forwards
 matching prefixes to a backend so the app can use same-origin paths
@@ -87,8 +113,10 @@ export default class Counter extends PuzzleView {
 Template syntax: `{ expr | formatter }` (formatters are registered display
 helpers — the project term is *formatter*, never *filter*),
 `{#if}/{:else if}/{:else}/{/if}`, `{#unless}`, `{#for item in items, i}`
-(trailing `, name` binds the index), `{#case}/{:when}`, `@event={ handler }`
-with modifiers, component imports used as capitalized tags.
+(trailing `, name` binds the index), `{#case}/{:when}`, `{#raw}…{/raw}` (brace
+grammar off inside — literal braces compile as-is, HTML still parses; no
+nesting, and attribute-value use is a compile error),
+`@event={ handler }` with modifiers, component imports used as capitalized tags.
 `<script lang="ts">` for TypeScript (transpile-only — types stripped, never
 checked, at compile).
 
@@ -97,11 +125,35 @@ Rules that bite:
 - **Text is text.** Template text is NOT HTML-entity decoded and interpolations
   become text nodes — you cannot inject markup through `{ expr }`. The one
   raw-markup exception is compile-time `{#svg 'path.svg'}` inline SVG.
-- **Three slot-like things, three meanings.** `<children/>` marks where a
-  component's default children render; `<slot name="x">fallback</slot>` declares
-  a named region (the caller routes a direct child in with a static
-  `slot="x"` attribute); `<Slot/>` is the ROUTER outlet where a child route or
-  routed view renders. Bare lowercase `<slot/>` is a compile error.
+  `{#raw}` is not a second one — it only turns the brace lexer off; no runtime
+  value can reach inside it.
+- **Two marker tags, three meanings.** `<Children/>` marks where a component's
+  default children render; `<Slot name="x"/>` declares a named region (the
+  caller routes a direct child in with a static `slot="x"` attribute);
+  `<Slot/>` is the ROUTER outlet where a child route or routed view renders.
+  A marker is self-closing, or paired with a fallback body that renders only
+  when nothing fills it (`<Slot name="trigger"><b>Open</b></Slot>`) — supplied
+  content replaces the fallback entirely. Lowercase `<children>`/`<slot>` are
+  compile errors.
+- **`<Portal>` teleports overlays.** `<Portal>…</Portal>` (paired-only,
+  attribute-free) mounts its children into a framework-created outlet beside
+  the app root while staying in the owner's component tree — for modals and
+  full-screen panels that must escape ancestor CSS. `@event:outside` treats
+  portaled content as inside its logical owner. Portals emit nothing in
+  prerendered HTML (content appears at takeover). For focus-trapped modals,
+  prefer native `<dialog>.showModal()` via a ref. A `<Portal>` cannot be a
+  COMPONENT's template root (the root receives call-site attrs and the scoped
+  style stamp) — wrap it: `<div style="display: contents"><Portal>…</Portal></div>`.
+  A portal-only view is fine.
+- **Error handling.** `new PuzzleApp({ onError(error, { phase, view, route }) })`
+  hears every framework-contained failure (mount, refresh, navigation);
+  `errorView: AppErrorView` (an ordinary compiled `.pzl` view) is the app-wide
+  fallback — a failed view/component is replaced in place by a fresh error-view
+  instance (parent and siblings survive) with `{ error, info, retry }` props;
+  `retry()` uses a full same-location navigation for routed failures or the
+  parent's normal refresh for component failures, never automatically. There
+  is no per-view error member — write error UI as normal template markup, never
+  as hand-built ViewNodes. Event handlers and formatters stay uncaught.
 - **`island` freezes children.** An element with the `island` attribute keeps
   its children untouched by patching after mount (for third-party DOM widgets);
   the element's own attrs/listeners still patch. Components, slots, and view
@@ -138,10 +190,53 @@ Rules that bite:
 - If a callback prop is wired into a long-lived external system, read it at fire
   time (`(e) => this.props.name?.(e)`), never capture it at wiring time.
 
+## Two-way form binding (puzzle ≥ 0.5.0)
+
+Form controls bind themselves — write NO input handler:
+
+```html
+<input value={ draft } />                             <!-- local state -->
+<input type="checkbox" checked={ todo.completed } />  <!-- record field -->
+<input type="number" value={ profile.hue } />         <!-- commits on change -->
+```
+
+- Binds when the expression is exactly `ident` or `ident.ident` on a plain
+  `<input>`/`<textarea>`/`<select>` with no author `@input`/`@change`, no
+  static `readonly`/`disabled`, and an absent or static classifiable `type`.
+  Never on components (their `value` is a plain prop). Excluded: radio, file,
+  `<select multiple>`, dynamic `type={ }`, `value` on a checkbox.
+- Text-ish inputs, textarea, and range update on `input`; number, checkbox,
+  date kinds, and select commit on `change`. Numeric edges: `''` writes
+  `null` (never `0`), NaN is skipped. Mid-IME-composition events never write.
+- **Bind the path you want written.** A member path (`profile.name`) writes
+  the record through validated `update()` — a rejected write reports to
+  `onError` with `phase: 'bind'` and leaves the typed text on screen. A bare
+  key (`draft`) writes local state AND re-runs `data()`, so derived values
+  (a filtered list, a disabled submit) stay live as you type. Do NOT bind a
+  local key that `data()` derives from a record — the next commit reverts it
+  (dev warns once per key).
+- Constrained fields (`required()`, `min(3)`): bind a local draft, commit
+  with `record.update()` on submit, pre-check with the non-throwing
+  `validate()` — a bind can never clear a `required()` field.
+- Opting out needs no syntax: write your own `@input`/`@change` (the author
+  handler owns the write — nothing is synthesized), use a non-path expression
+  (`value={ String(x) }`), or add static `readonly`. Migration gotcha: a
+  handler-less `value={ x }` that a `@keydown:enter` handler used to commit
+  is now live-bound — escape with `String(x)` when you need edit-buffer
+  semantics (Enter-commit / Escape-cancel).
+- In tests, `await handle.type('input.search', 'hello')` (from
+  `@magic-spells/puzzle/testing`) drives a bound control and settles.
+
 ## Routing
 
 `app/routes.js` exports an array of `{ path, name, view, layout, guard, meta, children }`.
 
+- **Router mode** (puzzle ≥ 0.6.0): path routing is the default — omit
+  `routerMode` entirely. Hash and memory routing are imported factories:
+  `import { hashRouter, memoryRouter } from '@magic-spells/puzzle/router-modes'`,
+  then `routerMode: hashRouter()` or `memoryRouter({ initialPath: '/' })`. The
+  strings `'hash'`/`'memory'` throw at construction (the error names the
+  import) — path-mode apps ship none of the other modes' code.
 - Nested routes: `children` with **relative** paths render at the parent view's
   `<Slot/>`; `layout` is top-level-only; params merge down the chain.
 - **Route guards** (puzzle ≥ 0.2.0): `guard: ({ to, from, ctx }) => verdict` on
@@ -171,13 +266,17 @@ Rules that bite:
   og/twitter/canonical tags are baked per page **at build time only** and are
   never touched at runtime. Crawlers and unfurlers GET each URL fresh and never
   client-navigate, so they always read the correct baked copy. The consequence:
-  under `output: 'spa'` (no prerender pass) `description`/`canonical`/
-  `socialImage` are accepted but **inert** — if you need social previews, build
+  in the default SPA build (no `output` key — the only valid values are
+  `'static'` and `'hybrid'`, so no prerender pass runs)
+  `description`/`canonical`/`socialImage` are accepted but **inert** — if you
+  need social previews, build
   `hybrid` or `static`. Do not write code that reads an og tag out of the live
   DOM after an in-app navigation; it will be navigation zero's value.
 - **Focus + route announcement are automatic** (puzzle ≥ 0.2.0): every committed
   navigation moves focus to the incoming view root (with `preventScroll`, under
-  a transient `tabindex="-1"`) and announces the committed title in a
+  a transient `tabindex="-1"` that also suppresses `outline`/`box-shadow` for
+  its lifetime — no focus ring around the view) and announces the committed
+  title in a
   framework-owned visually-hidden `aria-live` region. You get accessible SPA
   navigation for free — don't hand-roll it. `focusBehavior` mirrors
   `scrollBehavior`: omit for the default, `false` to disable entirely
@@ -195,7 +294,7 @@ Rules that bite:
   commits nothing.
 - Write template hrefs **path-shaped through the built-in `link` formatter**:
   `href="{ '/todos/' + t.id | link }"`. It emits the mode-appropriate href
-  (plain path in history mode, base-prefixed under `routerBase`, `#/...` in
+  (plain path in path mode, base-prefixed under `routerBase`, `#/...` in
   hash mode); strings not starting with `/` pass through (external URLs,
   `mailto:`, `#anchor`). Hand-written `#/...` hrefs still work in hash mode,
   but piped links are the portable spelling.
@@ -215,8 +314,39 @@ export default class Todo extends PuzzleModel {
     completed: Puzzle.boolean().default(false),
     createdAt: Puzzle.date().default(() => new Date()),
   };
-  // static adapter = { endpoint: '/api/todos' };  // enables loadOne/loadAll/save/delete
+  // static adapter = { endpoint: '/api/todos' }; // generates the five REST transports
 }
+```
+
+Enable server sync once through `app/adapter.js`; model files need no adapter import:
+
+```js
+// app/adapter.js — bare REST capability
+import { adapter } from '@magic-spells/puzzle/adapter';
+export default adapter;
+
+// app/app.js
+import adapter from './adapter.js';
+const app = new PuzzleApp({ target: '#app', routes, models, adapter });
+```
+
+For an app-wide API dialect, export `adapter.defaults({ ...verbs })` instead.
+The transport ladder, most-specific first, is: model function → app default →
+endpoint-generated REST. App defaults use the same five verbs but receive a
+trailing `{ type, endpoint }` argument after the normal verb arguments;
+`endpoint` is undefined for a model without one. A model function always wins
+and keeps its existing signature unchanged:
+
+```js
+// app/adapter.js — unwrap the same envelope for every model
+import { adapter } from '@magic-spells/puzzle/adapter';
+
+export default adapter.defaults({
+  async loadAll(fetch, options, { endpoint }) {
+    const response = await fetch(endpoint);
+    return (await response.json()).data;
+  },
+});
 ```
 
 Builders: `string() number() boolean() date() array() object()`, plus
@@ -230,12 +360,45 @@ Views reach the store as `this.ctx.store`:
 
 - Local: `createRecord(type, data)` (validates, defaults, notifies),
   `findOne(type, id)`, `findMany(type, { filter }?)`.
-- Server (needs `static adapter`): `loadOne`/`loadAll` (GET + identity-preserving
-  upsert), `record.save()` (POST new / PUT synced), `record.delete()`,
-  `store.request()` for custom endpoints — apply returned records with
-  `store.upsert(type, payload)`, don't re-fetch.
+- Server (needs a `static adapter` plus the `/adapter` capability passed once
+  to `PuzzleApp`): `loadOne`/`loadAll` (identity-preserving upsert),
+  `record.save()`, and `record.delete()`. `{ endpoint: '/api/todos' }` is the
+  REST shorthand: it generates GET/POST/PUT/DELETE transports. Override only
+  the verbs your API changes, or omit `endpoint` for a fully custom adapter.
+  `store.request()` remains the endpoint-prefixed JSON escape hatch.
 - Records mutate in place: `record.update(patch)`, `record.destroy()`,
   `record.validate()` → `{ valid, errors }` (non-throwing, for form UX).
+
+Adapter functions receive an enhanced `fetch` as their first argument. It has
+the standard fetch signature and returns a standard `Response`, but also runs
+`beforeRequest` and routes through the fixtures mock seam. Puzzle owns response
+validation and reconciliation after a framework verb returns:
+
+```js
+// REST shorthand
+static adapter = { endpoint: '/api/posts' };
+
+// Different URL, standard payload: Puzzle checks/parses the Response.
+static adapter = { loadAll: (fetch) => fetch('/v2/posts') };
+
+// Envelope + custom method
+static adapter = {
+  async loadAll(fetch, options) {
+    const query = new URLSearchParams(options);
+    return (await (await fetch(`/v2/posts?${query}`)).json()).data;
+  },
+  async publish(fetch, id) {
+    return (await fetch(`/v2/posts/${id}/publish`, { method: 'PATCH' })).json();
+  },
+};
+
+await store.loadAll('post', { page: 1 });
+await store.loadAll('post', { page: 2 }); // pages accumulate; existing ids merge
+const post = store.upsert('post', await store.adapter('post').publish(id));
+```
+
+Using global `fetch` instead of the supplied parameter is legal and literal:
+it bypasses both `beforeRequest` and fixtures interception.
 
 **Record identity ignores number/string spelling.** `findOne('todo', id)` returns
 the same record whether `id` is `7` or `'7'` — which matters constantly, because
@@ -246,12 +409,13 @@ comparison in `belongsTo`/`hasMany` uses the same rule. Only numbers normalize:
 `findOne('post', this.route.params.id)` is correct as written — do not add
 `Number(...)` coercion.
 
-**Auth headers: `beforeRequest`.** Every adapter call — reads, writes, and
-`store.request()` — funnels through one hook you set in the app config:
+**Auth headers: `beforeRequest`.** Generated transports, supplied-fetch calls,
+and `store.request()` funnel through one hook you set in the app config:
 
 ```js
 new PuzzleApp({
-  beforeRequest(init, { type, method, url }) {
+	adapter,
+	beforeRequest(init, { type, method, url }) {
     init.headers = { ...init.headers, Authorization: `Bearer ${token()}` };
   },
 });
@@ -297,12 +461,12 @@ await app.router.push('/todos/1');
 
 - `mountView(ViewClass, options)` mounts ONE view against a detached container.
   Options: `params`, `props`, `children`, `ref`, `route`, `models`, `store`,
-  `router`, `formatters`, `ctx`. Returns a handle: `instance`, `container`,
+  `router`, `formatters`, `adapter`, `ctx`. Returns a handle: `instance`, `container`,
   `element`, `ctx`, `store`, `router`, `find(sel)`, `findAll(sel)`,
   `click(target)`, `setProps(props)`, `destroy()`.
-- `createTestApp(config)` boots a REAL `PuzzleApp` — `target` and
-  `routerMode: 'memory'` are forced, everything else (including
-  `routerInitialPath`) passes through. Handle: `app`, `store`, `router`, `ctx`,
+- `createTestApp(config)` boots a REAL `PuzzleApp` — `target` and memory
+  routing are forced (`routerInitialPath` seeds it), everything else passes
+  through. Handle: `app`, `store`, `router`, `ctx`,
   `find`, `findAll`, `click`, `destroy()`.
 - `settled()` awaits the framework's pending render/flush work. `click()` and
   `setProps()` already await it; use it directly after mutating the store.
@@ -414,6 +578,12 @@ to `dist/404.html`; the route's `meta.title` is injected via a leaf→root walk.
   DOM-adoption hydration); all later navigation is client-side (transitions,
   morphs work). Pick this for apps that want SEO'd entry pages.
 
+`puzzle dev` on a static-mode project serves the REAL static output (clean
+URLs, full page loads, real 404s, prerender on every rebuild); hybrid projects
+dev as the SPA. `puzzle preview` serves an existing `dist/` with
+production-host semantics for any mode (SPA deep-link fallback, static real
+404s) — use `puzzle build && puzzle preview` to check the shipped artifact.
+
 1. **`data()` and `beforeMount` run under Node at build time** (both modes).
    Guard every browser global: `typeof document !== 'undefined'` before touching
    `document`, `window`, `localStorage`, `matchMedia`. DOM behavior belongs in
@@ -431,7 +601,7 @@ to `dist/404.html`; the route's `meta.title` is injected via a leaf→root walk.
    (`app/public/index.html`) may carry inline scripts (analytics, theme
    pre-paint). All other behavior: `mounted()` / cleanup in `destroyed()`.
 5. **Static mode has no router and emits only plain path hrefs.** Hash-style
-   `#/...` links are an SPA/hybrid concern (`routerMode: 'hash'`) with no
+   `#/...` links are an SPA/hybrid concern (`routerMode: hashRouter()`) with no
    meaning on a static site — never hand-write them in templates that build
    statically; path-shaped `| link` hrefs render as plain paths in static
    output and as `#/...` in a hash-mode SPA, from the same template.
@@ -441,6 +611,12 @@ to `dist/404.html`; the route's `meta.title` is injected via a leaf→root walk.
    config trigger a build warning); models are picked up from
    `app/models/index.js`. The `link` formatter is absent client-side in static
    output — its pass-through fallback still yields correct plain-path hrefs.
+   A configured adapter (`adapter.defaults(...)`) is best exported from
+   `app/adapter.js` and passed to the app from there: each static page then
+   imports just that module. Configuring it inline in `app.js` still builds
+   and behaves identically — the build falls back to importing the app entry
+   from every page to reach the exact configured value (an advisory notes the
+   page-weight cost). A bare `adapter` needs no file either way.
 6. `prerender: false` on a route emits an empty shell (invisible to any static
    search indexer): in hybrid it's an SPA island; in static it still gets its
    per-page module and renders fully client-side. Escape hatch for
@@ -464,12 +640,17 @@ shell).
 
 ## puzzle-pieces (component library)
 
-Copy-in registry, shadcn-style — NOT an npm import. Use `puzzle add piece
-<name…>` (copies each piece + its transitive piece/lib dependencies into the app
-verbatim, records hashes in `pieces.lock`; `--registry` overrides the source,
-`--overwrite` to refresh; required npm packages and the theme merge are printed
-as next steps). Once copied, a piece is YOUR code: import it like any component
-(`import Button from '../components/ui/Button.pzl'`) and use it as a capitalized
-tag. Pieces follow a `BASE` + `VARIANT`/`SIZE` class-map convention with a
+Copy-in registry, shadcn-style: the files land in your app; nothing imports
+the registry package at runtime. Use `puzzle add piece <name…>` (copies each
+piece + its transitive piece/lib dependencies verbatim, records hashes in
+`pieces.lock`; `--overwrite` to refresh; required npm packages and the theme
+merge are printed as next steps). The default source is the
+`@magic-spells/puzzle-pieces` npm package, version-locked to the CLI's
+major.minor (falls back to the newest OLDER release with a printed note).
+`--pieces-version` pins a release; `--registry` (or `$PUZZLE_PIECES_REGISTRY`)
+takes `npm:<package>[@version]`, a local directory, or an http(s) URL. Once
+copied, a piece is YOUR code: import it like any component (`import Button
+from '../components/ui/Button.pzl'`) and use it as a capitalized tag. Pieces
+follow a `BASE` + `VARIANT`/`SIZE` class-map convention with a
 `class` prop for caller overrides. Audit copied pieces for SSG rule #1 above
 before prerendering them.

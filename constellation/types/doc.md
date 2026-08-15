@@ -1,8 +1,14 @@
 # DOC cards (`DOC-`, `doc/`)
 
 No structured fields — DOC cards are prose. Suggested `kind`: `guide`, `rule`,
-`decision`, `meta`. Decisions (ADRs) get one DOC card each (`kind: decision`),
-never a section in `plan.md`.
+`meta`. DOCs explain *how* the system is set up; the *why* behind a choice is a
+[DECISION card](./decision.md), not a DOC.
+
+**Never create index cards** — a DOC that just enumerates other cards
+(`DOC-DECISIONS` listing every DECISION card, `DOC-APIS` listing every endpoint,
+a table-of-contents card). Those listings are *derived views*: `list_cards`,
+`search`, and the viewer already produce them live from the files, and a stored
+copy is stale the moment the next card is added. If you find one, delete it.
 
 Example — `constellation/doc/DOC-TICKET-LIFECYCLE.md`:
 

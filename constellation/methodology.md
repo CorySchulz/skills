@@ -18,7 +18,10 @@ It's a test of **coverage, not volume.** Rebuildable does not mean transcribing 
 markdown; it means capturing what someone would need to make the same decisions again — the
 structure, the contracts, the *why*. If a reader couldn't reconstruct a part from its card
 and connections, that's the gap to close (Step 7). The best plan is the *smallest* one that
-still passes this test.
+still passes this test. In particular, never create index cards that just enumerate other
+cards (a `DOC-DECISIONS` listing every DECISION, a table-of-contents card): those are
+derived views `list_cards` / `search` / the viewer already produce live from the files, and
+a stored copy is stale by the next card — delete any you find.
 
 ## Act as the architect
 
@@ -155,9 +158,13 @@ the plan the way a seasoned engineer reviews a design doc: assume something impo
 missing, and go find it. This matters more than any single card you write.
 
 **First, a quick hygiene sweep** (mechanical, cheap, not the point): `check_integrity` for
-orphans, `list_cards connected:false` for islands, lint for dangling `[[links]]`/refs (W004)
+orphans, `list_cards connected:false` for islands, `list_cards status: ["planned",
+"building", "none"]` for the open backlog, lint for dangling `[[links]]`/refs (W004)
 and unresolved structured refs (E005), plus code with no card and `built` cards with no
-code. Fix or note these and move on — they're table stakes.
+code. Skim the recorded memory too — `list_notes kind:gotcha` / `kind:deviation` surfaces
+earlier agents' traps and intentional divergences as review input. If a handle no longer
+says what its card is, `rename_card` moves the file and rewrites every reference plan-wide.
+Fix or note these and move on — they're table stakes.
 
 **Then the real review.** Run these lenses across each area *and* the whole — but calibrate
 to the project's stage and scope; a weekend prototype and a production system have very
@@ -200,7 +207,10 @@ the two kinds of finding:
 
 Keep it to the few highest-value items, each with a one-line *why* and the card(s) it
 implies. Capture confirmed gaps as `status: planned` cards — visible as intent, honest
-about not existing yet. Suggest structural cleanups (split an overloaded card, add a
+about not existing yet. When several planned cards form one coherent slice of work,
+group them under a `FEATURE` card (connected to each, intent/scope/acceptance in the
+body), optionally targeting a `RELEASE` milestone via its `release:` field — that is
+how iteration stays modeled once the initial build ships. Suggest structural cleanups (split an overloaded card, add a
 missing `STATE`, connect two islands) but leave the call to the user. Taste means proposing
 the smallest set of changes that most improves the plan — not the most cards.
 
@@ -211,8 +221,11 @@ the smallest set of changes that most improves the plan — not the most cards.
 - When reverse-engineering shipped code, default new cards to `built`, then verify in a
   second pass — don't claim `verified` you haven't earned.
 - After reconciling the plan with code, commit the plan, then `set_sync_point` to mark the
-  reconciliation. Change history is git (`diff_plan`, `plan_log`) — never stamp dirty
-  flags, changelogs, or timestamps into cards.
+  reconciliation. Change history is git (`diff_plan`, `plan_log`) — never stamp dirty flags
+  or changelogs into cards. The one allowed baseline is verification provenance: mark a card
+  `verified` with `set_verified` (it records `verified_sha`, the sha you checked against), so
+  `stale_report` / `check_sync` can later flag the card if its bound code moved. The
+  staleness verdict stays live — recomputed from git, never stored.
 - The opposite direction — bringing **code** up to a changed **plan** ("sync the plan to
   the code") — is its own loop, documented in *Syncing the plan to code* in `SKILL.md`:
   `diff_plan` → `traverse` the blast radius → update code → verify → `set_sync_point`. For a
@@ -226,3 +239,11 @@ the smallest set of changes that most improves the plan — not the most cards.
   reconcile (`check_integrity` for orphans, status bumps, `set_sync_point`). In plan mode, where
   writes are blocked, read the plan heavily to model the project fast and present the card edits
   you'll make. Full steps in *Changing code: plan-first* in `SKILL.md`.
+
+## Meta-feedback
+
+While you work with Constellation, notice anything that would make it better — a tool that
+was awkward or missing, an instruction that misled you, friction in the workflow, output
+that wasted your context. Collect these as you go, and at the end of the conversation give
+the user a short list of concrete improvement recommendations for Constellation itself
+(skip it if you have none).

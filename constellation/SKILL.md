@@ -1,6 +1,6 @@
 ---
 name: constellation
-description: Author and edit Constellation plan cards — markdown files in a constellation/ folder that model a project's architecture as a typed, connected graph. Use when creating, updating, or querying cards (API endpoints, data types, DB tables, flows, pages, etc.) in any repo with a constellation/ directory, or when setting up a plan in a repo that has none yet.
+description: Author and edit Constellation plan cards — markdown files in a constellation/ folder that model a project's architecture as a typed, connected graph. Use when creating, updating, or querying cards (API endpoints, data types, DB tables, flows, pages, etc.), when compacting a card whose note stream has grown stale or repetitive, in any repo with a constellation/ directory, or when setting up a plan in a repo that has none yet.
 ---
 
 # Constellation cards
@@ -9,6 +9,23 @@ A Constellation plan is a folder of markdown files. Each file is one **card** �
 typed piece of the plan, linked to other cards by **connections**. Filenames are
 identities, frontmatter is structure, the body is prose, and git is the
 change-tracking system.
+
+## Why it exists: durable cross-session memory
+
+Constellation is the project's **durable, cross-session memory** for AI agents — memory you
+share with every past and future agent, not docs you skim. Before changing code an area's
+cards cover, read those cards: you're recovering prior agents' understanding, not starting
+fresh. After changing that code, bring the cards back into line — that's part of "done,"
+like updating tests. Understanding then **compounds** across sessions instead of being
+re-derived each time — but only if the cards stay true, so **a card you can't trust is worse
+than no card.** Put in cards what code can't say (intent, decisions, current state, gotchas,
+cross-cutting rules); never duplicate DDL / signatures / code that lives in the repo — link
+to it, because copies drift. The same goes for the plan itself: never create index cards
+that enumerate other cards (a `DOC-DECISIONS` listing every DECISION, a card-type table of
+contents) — those are derived views `list_cards` / `search` / the viewer produce live, and
+a stored copy is stale by the next card; delete any you find. `built`/`verified` is a claim, not a fact: mark it with
+`set_verified` so a later agent can re-check whether the bound code moved (`stale_report` /
+`check_sync`). Durability, not distrust.
 
 ## The one rule that matters most
 
@@ -27,7 +44,8 @@ dashes only. No underscores, no lowercase.
 | `DB-`        | `db/`        | Tables / collections             | `types/db.md`        |
 | `DATATYPE-`  | `datatype/`  | Type schemas                     | `types/datatype.md`  |
 | `ROLE-`      | `role/`      | Roles / permissions              | `types/role.md`      |
-| `DOC-`       | `doc/`       | Documentation, rules, decisions  | `types/doc.md`       |
+| `DOC-`       | `doc/`       | Documentation, guides, rules     | `types/doc.md`       |
+| `DECISION-`  | `decision/`  | Architecture decisions (ADRs)    | `types/decision.md`  |
 | `FILE-`      | `file/`      | Source file references           | `types/file.md`      |
 | `TEST-`      | `test/`      | Test specs                       | `types/test.md`      |
 | `EXTERNAL-`  | `external/`  | External services                | `types/external.md`  |
@@ -40,6 +58,8 @@ dashes only. No underscores, no lowercase.
 | `DIAGRAM-`   | `diagram/`   | Architecture diagrams            | `types/diagram.md`   |
 | `AGENT-`     | `agent/`     | AI agent instructions            | `types/agent.md`     |
 | `PLAN-`      | `plan/`      | Plan docs (`plan.md` at root = `PLAN-PROJECT`) | `types/plan.md` |
+| `FEATURE-`   | `feature/`   | Future work units (iteration)    | `types/feature.md`   |
+| `RELEASE-`   | `release/`   | Version milestones               | `types/release.md`   |
 
 Read the matching `types/<type>.md` before writing a card of a type you haven't
 authored in this session — it has the field table and a golden example.
@@ -57,6 +77,16 @@ status: built                      # planned | building | built | verified
 connections:                       # plain list of handles — no kinds, no direction
   - DB-TICKETS
 ```
+
+Beyond the four reserved keys, a few **cross-type metadata fields** are valid on any card
+(defined in `schemas/card.json`) but are tool-managed, not hand-authored: `code_refs` (extra
+code this card is bound to — `path` or `path:symbol`), `verified_sha` / `verified_at` (set by
+`set_verified` — the drift baseline), and `notes` (append-only typed memory, via
+`append_note`). Reach for the tools rather than writing these by hand. Notes are
+retrievable: `search` matches note text, `list_notes` lists them across cards by kind
+(every gotcha / every decision in one call), and `get_card` filters them per card.
+A `decision` note is for a choice local to that one card; a decision that shaped
+*several* cards gets its own `DECISION` card, connected to each of them.
 
 ## Connections — how the graph gets wired
 
@@ -84,6 +114,8 @@ that's how you mark future work.
 - STATE: a ```mermaid stateDiagram-v2 block.
 - DIAGRAM: a ```mermaid flowchart with **handles as node IDs** so the diagram joins
   the graph.
+- DECISION: `## Context` / `## Decision` / `## Alternatives` / `## Consequences`
+  sections (suggested, not enforced).
 - Everything else: prose with `[[links]]`. Put relationship nuance in prose, not
   in structure.
 
@@ -143,12 +175,32 @@ Constellation:
    `set_sync_point`.
 
 **In plan mode, read as much of the plan as you can.** The write tools are unavailable there
-by design (the read tools — `get_card`, `list_cards`, `search`, `traverse`, `describe_type`,
-`check_integrity`, `diff_plan`, `plan_log` — are marked read-only and stay available). Spend
+by design (the read tools — `get_card`, `list_cards`, `search`, `traverse`, `assemble`,
+`describe_type`, `check_integrity`, `diff_plan`, `plan_log`, `stale_report`, `check_sync`,
+`list_connected_repos` — are marked read-only and stay available). Spend
 plan mode pulling the relevant plan into context — `traverse` from the entry points with
 `connected: "full"` — to build a strong model of the project fast, and fold the card edits
 you intend into the plan you present. Execute those Constellation writes first, before any
 code, once the user approves.
+
+## Iterating: features & releases
+
+PLAN cards and phases carry the *initial* build. Once a project is live, work
+arrives as feature branches and ships as versions — model that with FEATURE and
+RELEASE cards:
+
+- A coherent slice of future work is a **FEATURE** card: connect it to every card
+  it adds or touches (new work as `status: planned`), record intent / scope /
+  acceptance in the body, and set `branch:` while it's in flight. Its status is
+  the arc: `planned` → `building` (on its branch) → `built` (merged — set `pr:`
+  to the merged PR's link then, as provenance) → `verified`. A shipped FEATURE
+  stays — it's the record of why the system grew.
+- A version milestone is a **RELEASE** card; features target it via their
+  `release:` field. The body is theme + upgrade/migration notes — **never a
+  changelog** (what shipped is git's job).
+- Not a ticket tracker: work that's one card's status flip needs no FEATURE
+  card. The backlog stays `list_cards status: ["planned", "building", "none"]`;
+  a FEATURE's neighborhood (`traverse` from its handle) is the feature's spec.
 
 ## Syncing the plan to code
 
@@ -180,6 +232,61 @@ hold the macro view of the whole change rather than drowning in file-level edits
 change against the cards it was meant to satisfy and run the project's build/tests; never
 trust the sub-agents' reports alone. Only after that whole-plan verification passes do you
 commit and `set_sync_point` (once, as the orchestrator).
+
+## Compaction — keeping cards lean
+
+Cards grow two ways. Note streams accumulate interim verified stamps, `state` notes
+that later notes supersede, and gotcha/resolution pairs a reader must reconcile
+chronologically. Bodies accumulate history: superseded details, "we used to / now we"
+narration, folded-in state that was never pruned, restatements of what the code
+already says. Every future hydration of that card pays for all of it. Compaction is
+the curation pass that keeps the working set lean — **git preserves every deleted
+line**, so compacting curates what agents load, it never destroys history. A card
+body should read in about a minute and describe the *current* system, present tense.
+
+**Compact opportunistically.** When you are already updating a card — editing a
+section, folding in a change, re-stamping `verified` — and you see bloat (triggers
+below), compact it as part of that write; don't leave the mess for the next agent.
+Small, obviously-safe cleanups spotted while exploring (a superseded interim note, a
+paragraph describing behavior that no longer exists) are also fine to fix in passing.
+Reserve "recommend, don't touch" for the big jobs: a compaction large enough to
+derail your current task, or one where you'd have to delete something on the
+keep-list below — those get a one-line recommendation instead.
+
+**Triggers** (any of these → compact, or recommend if it's a big job):
+- The note stream exceeds ~10 entries.
+- A later note explicitly resolves or supersedes an earlier one (a gotcha marked
+  RESOLVED, a `state` note refining a previous `state` note).
+- Several interim `verified` stamps predate the newest one.
+- The body narrates history ("previously… but now…"), describes removed behavior,
+  or has grown well past what a reader needs to understand the current state.
+- You are about to re-stamp the card `verified` after a merge — the natural moment:
+  you have already re-read everything, so fold while you stamp.
+
+**The pass** (per card):
+1. **Fold** still-true `state` notes into the body — the body IS current reality;
+   a `state` note is a delta waiting to be merged.
+2. **Keep** (never delete): unresolved gotchas; **negative results** (disproven
+   hypotheses are the most valuable notes in the system — they stop the next agent
+   from re-investigating); the newest `verified` stamp; any note another card or
+   doc cites (`search` the note's distinctive phrases before deleting).
+3. **Delete**: superseded interim notes, resolved gotcha/resolution pairs (if the
+   episode leaves a lasting rule, fold that rule into the body first), and stale
+   `verified` stamps.
+4. **Trim the body**: rewrite bloated sections (`edit_section`) down to present-tense
+   current truth — cut superseded details, "used to be" narration, and anything that
+   restates the code. Keep the why; cut the was.
+5. **Mark it**: append one `state` note — "Note stream compacted into body at
+   `<sha>` — full history in git." A reader then knows the stream is curated, and
+   where the archaeology lives.
+6. **Never rewrite a kept note's text** to say something different — that is claim
+   revision, not compaction. If reality changed, the body is where you say so.
+
+**DECISION cards compact hardest.** One card per decision topic, updated in place:
+when a decision changes, rewrite the existing card to state only the current choice
+and why — the abandoned approach becomes a line in Alternatives, and git holds the
+full trail. Never create a successor DECISION card for the same topic; if you find
+a supersession chain, merge it into one card.
 
 ## Connected repos (multi-repo work)
 
@@ -222,14 +329,33 @@ Cards never connect across repos; the relationship between repos lives in the
 1. Before creating a card, check it doesn't exist: the filename is deterministic,
    so look up `constellation/<folder>/<HANDLE>.md`; grep for the handle to find
    prose references.
-2. Write or edit the card.
-3. Verify: `npx constellation lint` (errors break the graph and must be fixed;
+2. Write or edit the card — prefer small, byte-cheap writes over rewriting a whole card:
+   `append_note` for a typed note (decision / gotcha / state / deviation / verified),
+   `edit_section` to replace a single `##` section in place.
+3. Renaming a handle is a plan-wide operation: use the MCP `rename_card`, which moves the
+   file and rewrites every reference (connections, frontmatter values, `[[links]]`, mermaid
+   node IDs) as whole tokens. Never hand-rename the file and chase references yourself.
+4. Verify: `npx constellation lint` (errors break the graph and must be fixed;
    warnings are quality signals).
-4. Update `status` when reality changes: `planned → building → built`, and
-   `verified` only after checking the card against the actual code.
-5. Never bulk-rewrite `constellation/plan.md` — edit the relevant section.
-   Decisions go in DOC cards (`kind: decision`), one file each, not in the plan.
+5. Update `status` when reality changes: `planned → building → built`, and mark
+   `verified` only after checking the card against the actual code — use `set_verified`,
+   which records the git sha you checked against so later drift is detectable
+   (`stale_report` / `check_sync`). The backlog view — everything not yet built — is
+   `list_cards status: ["planned", "building", "none"]` (`"none"` = no status set).
+6. Never bulk-rewrite `constellation/plan.md` — edit the relevant section.
+   Decisions go in DECISION cards, one file each, not in the plan — connected to
+   the cards they shaped (card-local choices: `append_note(kind: decision)`).
 
 "What changed in the plan" is never tracked in cards — that's
-`git diff -- constellation/`. Don't add dirty flags, changelogs, or timestamps to
-frontmatter.
+`git diff -- constellation/`. Don't add dirty flags or changelogs to frontmatter. The one
+recorded baseline that's allowed is verification provenance — `verified_sha` / `verified_at`
+(set by `set_verified`), the basis of a "verified" claim, not a change flag; the staleness
+verdict itself is always recomputed live, never stored.
+
+## Meta-feedback
+
+While you work with Constellation, notice anything that would make it better — a tool that
+was awkward or missing, an instruction that misled you, friction in the workflow, output
+that wasted your context. Collect these as you go, and at the end of the conversation give
+the user a short list of concrete improvement recommendations for Constellation itself
+(skip it if you have none).
