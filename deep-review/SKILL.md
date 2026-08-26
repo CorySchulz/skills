@@ -35,34 +35,42 @@ If a tool isn't available (no git repo, `gh` not installed, PR fetch fails), don
 
 Match the review depth to the size of the scope. Do not run every phase at full depth on every invocation:
 
-| Scope | Layers | Phase 1 evidence | Codex finders | Phase 3 verification |
-| ----- | ------ | ---------------- | ------------- | -------------------- |
-| **Small** (1–3 files, small diff) | Skip Layer 1 unless the change is itself architectural (new module, new dependency direction, new pattern). Full Layers 2 and 3. | Skip | Skip | Critical/Important only |
-| **Medium** (a feature, a directory, a substantial diff) | Brief Layer 1 scoped to the touched area; full Layers 2 and 3. | Run | C1 + C2 | All findings |
-| **Large** (full project) | All three layers at full depth. | Run | C1 + C2, plus targeted tracing after Layer 2 | All findings |
+| Scope | Perspective reviewers | Phase 1 evidence | Codex finders | Phase 3 verification |
+| ----- | --------------------- | ---------------- | ------------- | -------------------- |
+| **Small** (1–3 files, small diff) | No reviewer agents — work the three perspectives yourself, in order. Skip the architecture perspective unless the change is itself architectural (new module, new dependency direction, new pattern). | Skip | Skip | Critical/Important only |
+| **Medium** (a feature, a directory, a substantial diff) | One agent per perspective, scoped to the touched area. | Run | C1 + C2 | All findings |
+| **Large** (full project) | All three perspectives, each split across areas — one agent per perspective per module or subsystem. | Run | C1 + C2, plus targeted tracing after synthesis | All findings |
 
 Spinning up eight agents to review one file is worse than reading it yourself — the coordination overhead buys nothing and the evidence agents have no history to find. Match the machinery to the job.
 
 ## Delegation Model
 
-Subagents gather and check. You judge. The review has four phases: gather evidence, work the layers, verify every finding, then report.
+Agents review, you judge. The review has four phases: gather evidence, run the perspective reviewers, verify every finding, then report.
+
+The core of Phase 2 is a panel of parallel reviewer agents, each reading the same scope with a different goal:
+
+- **Bugs & edge cases** — line-level correctness: the micro checklist.
+- **Architecture & outside connections** — structure, boundaries, and everything this code touches beyond itself: the macro checklist.
+- **Code quality & consistency** — design, conventions, and tests: the mid-level checklist.
+
+On large scopes, additionally split each perspective across areas — one agent per perspective per module or subsystem — so every agent has both a lens and a territory. The perspectives overlap on purpose: two perspectives flagging the same code is signal, not waste.
 
 | Job | Who | Model |
 | --- | --- | ----- |
 | Evidence gathering (Phase 1) | subagent | `sonnet` |
-| Layer 1 — macro architecture | **you** | — |
-| Layers 2–3 | **you** | — |
+| Perspective reviewers (Phase 2) | subagents, one per perspective (× area on large scopes) | `opus` |
 | Technical finders (Phase 2) | Codex | Codex (`--effort xhigh` for C2) |
+| Synthesis — dedup, severity, fix effort | **you** | — |
 | Verification (Phase 3) | subagent | **`opus`** |
-| Report synthesis (Phase 4) | **you** | — |
+| Report (Phase 4) | **you** | — |
 
 Pin the model explicitly on every dispatch. Do not let a subagent inherit whatever the session happens to be running.
 
 Three rules that do not bend:
 
-1. **Verification is Opus. Always.** Never Sonnet, never Haiku, never Codex — not even when every other agent in this review is running Sonnet. Verification is the one step where being wrong is most expensive, because it decides whether a finding reaches the user at all.
-2. **Codex finds, Codex never judges.** Codex agents produce candidate findings only. They never verify a finding, never assign a severity, and never touch Layer 1.
-3. **Never write a finding about code you have not read yourself.** Subagent output tells you where to look, never what to conclude.
+1. **Verification is Opus. Always.** Never Sonnet, never Haiku, never Codex — not even when every other agent in this review is running Sonnet. Verification is the one step where being wrong is most expensive, because it decides whether a finding reaches the user at all. And the verifier is never the agent that drafted the finding.
+2. **Reviewers find, reviewers never judge.** Perspective reviewers and Codex agents produce candidate findings only — location, what, and a concrete failure scenario. They never assign severity and never decide what reaches the report. You do, in synthesis.
+3. **Never report a finding about code you have not read yourself.** Agent output tells you where to look, never what to conclude — before a candidate goes to verification, open the cited code and confirm you can see what the reviewer saw.
 
 ## Diff Reviews: Introduced vs. Pre-existing
 
@@ -77,20 +85,20 @@ A clean change in a messy codebase deserves a clean verdict. Never fail a diff r
 
 Run for diff and PR scopes at medium size or larger. Four Sonnet agents in parallel.
 
-These agents return **cited facts, not findings**. A finding requires judgment they are not being asked to exercise. What they produce changes what you look for in the layers; it does not go into the report on its own.
+These agents return **cited facts, not findings**. A finding requires judgment they are not being asked to exercise. What they produce becomes the evidence pack handed to every perspective reviewer; it does not go into the report on its own.
 
 - **Conventions** — the root CLAUDE.md, any CLAUDE.md in directories the change touches, and lint/style config. Return the specific rules that could bear on this change, each quoted with its `file:line`. Not a summary of the file — the applicable rules, verbatim.
 - **History** — `git blame` and `git log -L` over the changed line ranges. For each touched region: when it last changed, what the commit said, and whether any prior commit was a fix. A line introduced by `fix: guard against empty batch` is a different line than one introduced by `initial commit`, and simplifying the first one is how a bug comes back.
 - **Prior review comments** — **PR scopes only.** Merged PRs that touched these files (`gh pr list`), and the review comments left on them. Return any that could apply again. Don't run this on a local diff; without a PR history to search it returns nothing and costs a round trip. Skip silently if `gh` is missing.
 - **Comments as spec** — doc comments, invariant comments, and TODOs in and around the changed code. Return any that the change could contradict. A comment saying "callers must hold the lock" is a contract, and the diff either honors it or breaks it.
 
-## Phase 2 — Execute the Review Layers
+## Phase 2 — Perspective Reviewers
 
-Work through each layer sequentially. Each layer builds on the understanding gained from the previous one.
+Dispatch the perspective reviewers in parallel, each pinned to `model: 'opus'`. Every reviewer gets the scope, the Phase 1 evidence pack, its own checklist below, and the same instruction: return candidate findings only — location, what, and a concrete failure scenario — with no severity attached.
 
-The checklists below name common failure modes, not an exhaustive or language-specific list. Adapt them to the language and stack under review — every language has its own idioms and failure modes (e.g., nil maps and goroutine leaks in Go, mutable default arguments in Python, lifetime and unwrap issues in Rust, undefined/this binding in JavaScript).
+The checklists below name common failure modes, not an exhaustive or language-specific list. Have each reviewer adapt its checklist to the language and stack under review — every language has its own idioms and failure modes (e.g., nil maps and goroutine leaks in Go, mutable default arguments in Python, lifetime and unwrap issues in Rust, undefined/this binding in JavaScript).
 
-### Layer 1 — Macro Architecture
+### Perspective 1 — Architecture & Outside Connections (macro)
 
 Zoom out. Map the system from above before touching any details.
 
@@ -102,8 +110,9 @@ Examine:
 - **Architectural patterns** — Identify the patterns in use (pub/sub, dependency injection, state management, plugin systems, etc.). Assess whether they are applied consistently or if some areas deviate without good reason.
 - **Extension points** — Is the system designed to grow? Where would a new feature slot in cleanly, and where would it require surgery?
 - **Missing abstractions** — Look for repeated structural patterns that suggest a missing shared abstraction, base class, or utility.
+- **Outside connections** — Every boundary this code shares with the world beyond itself: APIs consumed and exposed, databases, queues, files, environment config, third-party services. Are those contracts explicit, is failure at each boundary handled, and is data validated as it crosses in or out?
 
-### Layer 2 — Mid-Level Design
+### Perspective 2 — Code Quality & Consistency (mid-level)
 
 Zoom into the boundaries between components. This is where integration bugs and design debt accumulate.
 
@@ -117,9 +126,9 @@ Examine:
 - **Configuration and defaults** — Examine how options/config flow through the system. Look for magic values, undocumented defaults, or config validated too late.
 - **Test coverage of the behavior** — Do tests exist for the code under review? Did behavior change without any test changing? Are the critical paths and failure paths tested, or only the happy path? Untested behavioral change in a diff is a finding, not a footnote.
 
-### Layer 3 — Micro Implementation
+### Perspective 3 — Bugs & Edge Cases (micro)
 
-Zoom all the way in. Read line by line through the critical paths identified in the previous layers.
+Zoom all the way in. Read line by line through the hot paths: new code, state-carrying code, and anything the evidence pack flagged.
 
 Examine:
 
@@ -131,11 +140,13 @@ Examine:
 - **Resource cleanup** — Listeners not removed, intervals/timeouts not cleared, file handles/connections/locks not released on error paths, subscriptions or goroutines/tasks that outlive their owner.
 - **Security surface** — Untrusted input reaching an interpreter or renderer: SQL/command/template injection, path traversal, unsanitized HTML or URL construction, unsafe deserialization, secrets or credentials committed in code, regex denial-of-service, missing authorization checks on sensitive operations.
 
-### Codex Finders (run in parallel with the layers)
+### Synthesis (you)
 
-The layers stay yours and stay sequential — Layer 1 is what tells you which paths deserve Layer 3's attention. Do not parallelize them and do not delegate them.
+When the reviewers return, merge their candidates yourself. Dedup overlapping findings — the perspectives will overlap, and two perspectives independently flagging the same code is corroboration, not noise. Read the cited code for every candidate you keep (rule 3), then assign severity and fix effort. Strip any recommendation that adds an abstraction, indirection layer, config option, or design pattern unless it fixes a concrete bug you can state as a failure scenario — over-engineering survives in agent output; it must not survive synthesis.
 
-While you work them, dispatch Codex finders alongside. Codex is strong at exhaustive mechanical reasoning — walking every call site, every branch, every boundary value — which is expensive in attention and cheap in judgment. That is the slot it fills.
+### Codex Finders (run in parallel with the perspective reviewers)
+
+Dispatch Codex finders at the same time as the perspective reviewers. Codex is strong at exhaustive mechanical reasoning — walking every call site, every branch, every boundary value — which is expensive in attention and cheap in judgment. That is the slot it fills.
 
 Dispatch with the `codex:codex-rescue` subagent:
 
@@ -154,9 +165,9 @@ Dispatch both of these at the start of Phase 2:
 - **C1 — shallow diff scan.** The changed lines only, no wider context. Large, obvious bugs. Deliberately context-starved: it catches the things that deep reading talks itself out of.
 - **C2 — technical correctness**, with `--effort xhigh`. Concurrency and ordering, arithmetic and boundary conditions, resource lifecycle, state-machine and protocol correctness.
 
-On large scopes, dispatch one more after Layer 2, once you can name a concrete target: exhaustive tracing of a specific symbol — "every call site of `parseConfig`, and which of them can reach it with an absent value." This is the single best use of Codex in a review, but it only works when you can be that specific, which is why it waits for Layer 2.
+On large scopes, dispatch one more during synthesis, once you can name a concrete target: exhaustive tracing of a specific symbol — "every call site of `parseConfig`, and which of them can reach it with an absent value." This is the single best use of Codex in a review, but it only works when you can be that specific, which is why it waits for the perspective reviewers to return.
 
-**Never send Codex an architecture question.** Not module boundaries, not dependency direction, not "should this be structured differently", not severity calls, not anything from Layer 1. It answers those with abstraction layers, factories, and config knobs you did not need.
+**Never send Codex an architecture question.** Not module boundaries, not dependency direction, not "should this be structured differently", not severity calls, not anything from the architecture perspective — that belongs to the architecture reviewer and to you. Codex answers those with abstraction layers, factories, and config knobs you did not need.
 
 ### Handling Codex Output
 
@@ -194,7 +205,7 @@ Calibrating effort:
 
 ## What Not to Report
 
-These are the recurring false positives. Recognize them during the layers, and reject them again during verification:
+These are the recurring false positives. Warn the perspective reviewers about them, reject them yourself during synthesis, and expect verification to reject them again:
 
 - **Pre-existing issues presented as introduced**, including real issues on lines the change didn't touch. Tag them Pre-existing or leave them out.
 - **Things that look like a bug but aren't** once you trace the actual call sites.
@@ -243,11 +254,11 @@ Two to three sentences: what was reviewed, how many files, which area of the cod
 
 ### 2. Architecture Overview — conditional
 
-One paragraph describing the macro-level architecture as understood from reading the code. Establish shared context before diving into findings. Skip when Layer 1 was skipped.
+One paragraph describing the macro-level architecture as understood from reading the code. Establish shared context before diving into findings. Skip when the architecture perspective was skipped.
 
 ### 3. Findings — required
 
-Group by severity (Critical first, then Important, Minor, Nit). Within each group, order by review layer (Macro → Mid → Micro). For diff reviews, list Introduced findings first and collect Pre-existing ones under their own heading.
+Group by severity (Critical first, then Important, Minor, Nit). Within each group, order by perspective (macro → mid-level → micro). For diff reviews, list Introduced findings first and collect Pre-existing ones under their own heading.
 
 For each finding:
 
