@@ -27,15 +27,20 @@ Common values: `fw-300`, `fw-400`, `fw-500`, `fw-600`, `fw-700`, `fw-800`, `fw-9
 | `font-helvetica` | Helvetica Neue, Helvetica, Arial, sans-serif |
 | `font-georgia` | Georgia, Times New Roman, Times, serif |
 
-### Heading Classes — `.h1` through `.h6`
-Typography presets using heading font variables (`--h1-font-size`, `--h1-line-height`, `--h1-letter-spacing`, etc.). Defined in `styles/base/_typography.css`.
-
-### Special Typography
+### Semantic Typography Scale — `fs-` classes
+Defined in `styles/base/typography.css`. Each sets font-family, weight, size, and line-height together. Numeric `fs-{n}` sizes are **deprecated** — never write them in markup (the dynamic utility survives only for legacy merchant picker settings).
 
 | Class | Purpose |
 |---|---|
-| `.overline-heading` | Uses `--overline-*` variables (font, size, weight, spacing, transform, color) |
-| `.subheading` | Uses `--subheading-*` variables |
+| `fs-heading-1`…`fs-heading-6` | Heading presets from `--h1-*`…`--h6-*` variables; applied to `h1`–`h6` automatically in the base layer. Sizes ride the responsive `--font-scale` ladder (h6 = 1rem … h1 = scale⁵). h1–h4 default to the heading font face, h5/h6 to the body face |
+| `fs-overline` | Uses `--overline-*` variables (font, size, weight, spacing, transform) |
+| `fs-subheading` | Uses `--subheading-*` variables |
+| `fs-body-xs` / `fs-body-sm` / `fs-body-md` / `fs-body-lg` | Body copy — rem multiples of the merchant base font size (×0.75/0.875/1/1.125 → 12/14/16/18px at default), static across breakpoints. `fs-body-xs` is fine print only; `body` gets `fs-body-md` automatically |
+
+### Card Title Typography
+
+| Class | Purpose |
+|---|---|
 | `.product-card-title` | Card-specific font preset |
 | `.collection-card-title` | Card-specific font preset |
 | `.article-card-title` | Card-specific font preset |

@@ -38,7 +38,7 @@ Follow this skeleton for every new section:
   <div class="container">
 
     {% if s.overline != blank %}
-      <p data-aos="fade-in-up" class="overline-heading">
+      <p data-aos="fade-in-up" class="fs-overline">
         {{ s.overline }}
       </p>
     {% endif %}
@@ -355,7 +355,9 @@ Available utility classes within a color scheme context:
 
 | Utility                                                                     | What it does                                               |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `fs-{n}`                                                                    | Font size in px → rem (e.g. `fs-18` = 18/16 rem)           |
+| `fs-heading-1`…`fs-heading-6`                                               | Semantic heading styles (family/weight/size/spacing/case from `--h1-*`…`--h6-*` vars; h1–h4 default heading face, h5/h6 body face) |
+| `fs-overline` / `fs-subheading`                                             | Overline (eyebrow) and subheading presets                  |
+| `fs-body-xs` / `fs-body-sm` / `fs-body-md` / `fs-body-lg`                   | Body copy: merchant base × 0.75/0.875/1/1.125 (12/14/16/18px at default). `xs` is fine print only; `body` gets `fs-body-md` automatically |
 | `fw-{n}`                                                                    | Font weight (e.g. `fw-400`, `fw-700`)                      |
 | `font-body` / `font-heading` / `font-subheading` / `font-accent`            | Theme font families                                        |
 | `container`                                                                 | Max-width + gutter padding                                 |
@@ -372,8 +374,8 @@ Available utility classes within a color scheme context:
 | `aspect-product-card`                                                       | Product thumbnail aspect ratio                             |
 | `rounded-inputs` / `rounded-buttons` / `rounded-theme` / `rounded-theme-sm` | Theme border radii                                         |
 | `h-100vh` / `h-100svh` / `h-100dvh` / `h-hero`                              | Height utilities                                           |
-| `overline-heading`                                                          | Overline typography preset                                 |
-| `.h1`–`.h6`                                                                 | Heading typography presets                                 |
+
+**Never use numeric font sizes** (`fs-18` etc.) — the old dynamic `fs-{n}` utility is deprecated and survives only for legacy merchant picker settings. Always use the semantic `fs-` classes above; each sets family, weight, size, and line-height together, so don't pair one with a `font-*` family utility unless deliberately overriding the family. See `notes/Font-Notes.md` in the repo for deferred typography work (nav, announcement bar, icon sizing).
 
 **Breakpoints:** sm(576) · md(768) · mde(896) · lg(1024) · xl(1280) · 2xl(1536) · 3xl(1920)
 
