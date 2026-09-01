@@ -40,6 +40,12 @@ $deep-review
 
 ## Skills
 
+### tasteful-frontend
+
+The design skill. Combines the best of Anthropic's frontend-design, Impeccable, and Hallmark into one focused, portable skill with no scripts or ceremony. Maps the "AI slop" tells by era (including the 2024–26 anti-slop defaults that became the new slop), forces a decision instead of a default (derive a world from the subject, commit to a thesis, signature, and first viewport), enforces structural variety with the silhouette test, gives real permission for modern motion (View Transitions, scroll-driven animation, `@starting-style`, micro-interactions) with the discipline to keep it tasteful, and ships a mechanical craft floor, a type and color guide with the "spent" font list, a copy guide, and an audit format.
+
+**Trigger:** Any front-end visual work — building or redesigning pages, screens, or components; type, color, layout, motion, or UX copy; "make it look good", "this looks like a template", "add some animation", "polish this", or `/tasteful-frontend audit <target>`
+
 ### deep-review
 
 Structured, three-layer code review that actually finds real issues. (Formerly named `code-review` — renamed to avoid shadowing Claude Code's built-in `/code-review` command.) Reviews in three passes — macro architecture, mid-level design, and micro implementation — then classifies findings by severity (Critical / Important / Minor / Nit). Focuses on bugs that will actually bite you, not stylistic nitpicks.

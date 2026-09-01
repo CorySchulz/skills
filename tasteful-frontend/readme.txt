@@ -1,0 +1,1 @@
+Used in ~/.claude/skills to give claude code design taste: modern, expressive front-end work that does not look generated.
