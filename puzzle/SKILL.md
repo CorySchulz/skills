@@ -38,9 +38,11 @@ my-app/
 
 CLI (bin `puzzle`, installed with `@magic-spells/puzzle`):
 `dev` (SSE live reload, state-preserving full-page refresh), `build` (`--static`,
-`--hybrid`, `--mode production|development`), `preview` (serve an existing
-`dist/` with production-host semantics), `init`, `generate`, `add` (tailwind integration,
-`piece <name…>`, `skills`), `upgrade`, `doctor`, `info`.
+`--hybrid`, `--mode production|development`), `check` (run the app-installed
+TypeScript compiler over `.pzl` scripts and template expressions), `preview`
+(serve an existing `dist/` with production-host semantics), `init`, `generate`,
+`add` (tailwind integration, `piece <name…>`, `skills`), `upgrade`, `doctor`,
+`info`.
 
 - `dev` and `build` both take `--fixtures` (see Fixtures below).
 - `dev` and `build` both take `--profile-build` (or `PUZZLE_PROFILE_BUILD=1`):
@@ -115,10 +117,12 @@ helpers — the project term is *formatter*, never *filter*),
 `{#if}/{:else if}/{:else}/{/if}`, `{#unless}`, `{#for item in items, i}`
 (trailing `, name` binds the index), `{#case}/{:when}`, `{#raw}…{/raw}` (brace
 grammar off inside — literal braces compile as-is, HTML still parses; no
-nesting, and attribute-value use is a compile error),
-`@event={ handler }` with modifiers, component imports used as capitalized tags.
-`<script lang="ts">` for TypeScript (transpile-only — types stripped, never
-checked, at compile).
+nesting, and attribute-value use is a compile error; a single literal brace
+anywhere, attribute values included, is `\{` / `\}` — e.g. `pattern="[0-9]\{5\}"`),
+`@event={ handler }` with modifiers, component imports used as capitalized tags
+(dotted family members too — `<Frame.Wrapper>`).
+`<script lang="ts">` for TypeScript (build remains transpile-only; run
+`puzzle check` separately for static checks).
 
 Rules that bite:
 
@@ -127,14 +131,55 @@ Rules that bite:
   raw-markup exception is compile-time `{#svg 'path.svg'}` inline SVG.
   `{#raw}` is not a second one — it only turns the brace lexer off; no runtime
   value can reach inside it.
-- **Two marker tags, three meanings.** `<Children/>` marks where a component's
+- **Three marker tags, four meanings.** `<Children/>` marks where a component's
   default children render; `<Slot name="x"/>` declares a named region (the
   caller routes a direct child in with a static `slot="x"` attribute);
-  `<Slot/>` is the ROUTER outlet where a child route or routed view renders.
-  A marker is self-closing, or paired with a fallback body that renders only
-  when nothing fills it (`<Slot name="trigger"><b>Open</b></Slot>`) — supplied
-  content replaces the fallback entirely. Lowercase `<children>`/`<slot>` are
-  compile errors.
+  `<Slot/>` is the ROUTER outlet where a child route or routed view renders;
+  `<Snippet>` passes a reusable template that the component may stamp repeatedly
+  with fresh data. Composition `<Children>` and named `<Slot>` markers may carry
+  data attributes, and a snippet declares matching parameters as bare
+  attributes; binding is by name. `fits="x"` routes it to `<Slot name="x">`,
+  while omitted `fits` targets `<Children>`. Ordinary Children/Slot markers may
+  be paired with fallback content, which supplied content replaces entirely. A
+  Snippet must be paired and be a direct child of a component call; composition
+  markers and `ref=` are forbidden inside its body. Lowercase
+  `<children>`/`<slot>`/`<snippet>` steer to the capitalized marker spellings
+  with compile errors.
+
+  ```html
+  <UserList>
+    <Snippet fits="row" user><strong>{ user.name }</strong></Snippet>
+  </UserList>
+
+  <!-- inside UserList.pzl: one marker in the loop produces N stamps -->
+  {#for user in users}<Slot name="row" user={ user } />{/for}
+  ```
+
+- **Component families are dotted tags + a barrel** (puzzle ≥ 0.7.0). A
+  capitalized tag must be `Ident('.'Ident)*` — `<Card>` or `<Frame.Wrapper>`;
+  a dash, a colon, or an empty segment is a compile error, and a marker name
+  (`Children`/`Slot`/`Snippet`/`Portal`) cannot be a family root. A dotted tag
+  is a plain member expression resolved against module scope, so group the
+  family in a directory with a plain JS barrel — `.pzl` stays ONE class per
+  file, and there is no registry or compiler magic:
+
+  ```js
+  // app/components/Frame/index.js — beside Frame.pzl, Wrapper.pzl, Content.pzl
+  import Frame from './Frame.pzl';
+  import Wrapper from './Wrapper.pzl';
+  import Content from './Content.pzl';
+
+  export { Frame, Wrapper, Content };
+  export default Object.assign(Frame, { Wrapper, Content });
+  ```
+
+  ```html
+  <!-- import Frame from '@/components/Frame'; -->
+  <Frame><Frame.Wrapper><Frame.Content>…</Frame.Content></Frame.Wrapper></Frame>
+  ```
+
+  `puzzle generate component Frame --family Wrapper,Content` scaffolds it all.
+
 - **`<Portal>` teleports overlays.** `<Portal>…</Portal>` (paired-only,
   attribute-free) mounts its children into a framework-created outlet beside
   the app root while staying in the owner's component tree — for modals and
@@ -244,7 +289,10 @@ Form controls bind themselves — write NO input handler:
   once to lock the whole layout subtree; a child may add its own stricter
   guard (they run root→leaf, first failure wins). Verdicts: `undefined`/`true`
   allow; `false` blocks (stay put, nothing commits); a path string redirects
-  via `replace()` semantics (denied URL never enters history). Guards run
+  (the denied URL never enters history, and the redirect inherits the denied
+  navigation's verb — a push redirect mints one entry for the destination, so
+  Back still reaches the page the user came from; pop and nav #0 redirects
+  replace the entry the browser already sits on). Guards run
   before views construct or `data()` runs, on every navigation including
   params-only and nav #0 (`from === null` there); async guards are awaited.
   Restore sessions in the app-config `beforeMount(app)` hook (awaited before
@@ -256,7 +304,9 @@ Form controls bind themselves — write NO input handler:
   `prerender: false`), and static output warns too (no router — guards never
   run there).
 - `:param` and `*` supported; `*` catch-all must stay **last** (routes match in
-  order). Route views/layouts must be **statically imported** in routes.js.
+  order). Route views/layouts may be statically imported or wrapped in
+  `lazy(() => import('./View.pzl'))`; guards run before a lazy module downloads,
+  and `build.splitting: true` lets the dynamic import become its own chunk.
 - **Head metadata lives on `meta`** (puzzle ≥ 0.2.0): `title`, `description`,
   `canonical`, `socialImage` — static strings, each inherited leaf→root
   independently (`null` suppresses an inherited value). Define root-route
@@ -334,15 +384,18 @@ For an app-wide API dialect, export `adapter.defaults({ ...verbs })` instead.
 The transport ladder, most-specific first, is: model function → app default →
 endpoint-generated REST. App defaults use the same five verbs but receive a
 trailing `{ type, endpoint }` argument after the normal verb arguments;
-`endpoint` is undefined for a model without one. A model function always wins
-and keeps its existing signature unchanged:
+`endpoint` is undefined for a model without one. `endpoint` is the raw value
+declared on the model and is **not** `apiURL`-prefixed — only the generated
+transport prepends `apiURL` — so a dialect in an app that sets `apiURL` must
+prefix it itself. A model function always wins and keeps its existing
+signature unchanged:
 
 ```js
 // app/adapter.js — unwrap the same envelope for every model
 import { adapter } from '@magic-spells/puzzle/adapter';
 
 export default adapter.defaults({
-  async loadAll(fetch, options, { endpoint }) {
+  async loadMany(fetch, options, { endpoint }) {
     const response = await fetch(endpoint);
     return (await response.json()).data;
   },
@@ -358,16 +411,75 @@ Register model classes in the app's `models` config.
 
 Views reach the store as `this.ctx.store`:
 
-- Local: `createRecord(type, data)` (validates, defaults, notifies),
-  `findOne(type, id)`, `findMany(type, { filter }?)`.
-- Server (needs a `static adapter` plus the `/adapter` capability passed once
-  to `PuzzleApp`): `loadOne`/`loadAll` (identity-preserving upsert),
-  `record.save()`, and `record.delete()`. `{ endpoint: '/api/todos' }` is the
-  REST shorthand: it generates GET/POST/PUT/DELETE transports. Override only
-  the verbs your API changes, or omit `endpoint` for a fully custom adapter.
-  `store.request()` remains the endpoint-prefixed JSON escape hatch.
-- Records mutate in place: `record.update(patch)`, `record.destroy()`,
+- Reads: `findOne(type, id)`, `findMany(type, { filter }?)`.
+- Writes: `createRecord(type, data)` (validates, defaults, notifies), then
+  records mutate in place — `record.update(patch)`, `record.destroy()`,
   `record.validate()` → `{ valid, errors }` (non-throwing, for form UX).
+- Server sync (needs a `static adapter` plus the `/adapter` capability passed
+  once to `PuzzleApp`): `record.save()` and `record.delete()` write back.
+  `{ endpoint: '/api/todos' }` is the REST shorthand: it generates
+  GET/POST/PUT/DELETE transports. Override only the verbs your API changes, or
+  omit `endpoint` for a fully custom adapter. `store.request()` remains the
+  endpoint-prefixed JSON escape hatch.
+
+### Server data: one rule
+
+**Server data comes from `data()`. `findOne`/`findMany` fetch what the store is
+missing. A committed `null` means the record does not exist.**
+
+There is no loading code to write, no `load()` hook, no `{#await}`, no seeding
+step. A tracked find that misses returns `null` (or an empty array) and queues
+the fetch; the view does not commit that pass. Puzzle re-runs `data()` behind
+the batch until a pass comes back with every read warm, and commits that one. So
+this is the entire data layer of a deep-linkable detail page:
+
+```js
+data(params) {
+  const store = this.ctx.store;
+  const post = store.findOne('post', params.id);
+  const author = post ? store.findOne('user', post.authorId) : null;
+  return { post, author };
+}
+```
+
+Land on it with an empty store and it settles in three rounds — miss the post,
+get the post and miss the author, get both — then renders once, fully populated.
+Nothing declares that the author depends on the post; the loop discovers it.
+
+What follows from the rule:
+
+- **`null` is never "still loading."** `{#if post} … {:else} Not found` needs no
+  companion `loaded` flag. A `null` you can see is a 404 (or a model with no
+  read verb), full stop.
+- **Only a tracked `data()` run fetches, and only through `this.ctx.store`.**
+  Read the store the way the example above does. `this.ctx.store` is a per-view
+  handle, and a read through it, by this view, during this view's own `data()`
+  run is the one thing that can fault: event handlers, model methods, timers,
+  and a store captured in a module variable all get a local snapshot and never
+  issue a request. A handler that needs fresh server data changes state and
+  calls `this.refresh()`, which re-enters the loop. Calling
+  `store.loadOne`/`store.loadMany` from inside
+  `data()` warns in dev and points you at `findOne`/`findMany` — the imperative
+  loaders are a force-refresh escape hatch, not the read path.
+- **Relationships never fetch.** `post.author` and `post.comments` are local
+  lookups by design, so a 50-row list cannot become 50 GETs. When a view needs a
+  related record that may be missing, it asks for it: one more tracked find on
+  the foreign key, as above.
+- **No adapter, no read verb ⇒ nothing changes.** A model with no `static
+  adapter` (or a fixtures/local-first app) keeps pure local finds. `findOne`
+  needs a resolvable `loadOne`; `findMany` needs a resolvable `loadMany`.
+- **Requests dedupe and cache for the session.** Concurrent misses on the same
+  identity share one request; a successful no-options `findMany(type)` marks the
+  type complete so later finds on it are pure local reads; a 404 is remembered,
+  so a missing id is not re-requested on every render.
+- **`data()` must tolerate running several times per navigation.** Keep it a
+  pure derivation — no side effects, no one-shot gates.
+- **Errors fail the navigation.** A network failure, a 500, or a malformed body
+  rejects the run and goes to `errorView`. Only a 404 becomes a committed
+  `null`.
+
+Skeletons need no change: every settle round counts as one load, so a
+`<puzzle-skeleton>` shows once and holds until the view commits.
 
 Adapter functions receive an enhanced `fetch` as their first argument. It has
 the standard fetch signature and returns a standard `Response`, but also runs
@@ -379,11 +491,11 @@ validation and reconciliation after a framework verb returns:
 static adapter = { endpoint: '/api/posts' };
 
 // Different URL, standard payload: Puzzle checks/parses the Response.
-static adapter = { loadAll: (fetch) => fetch('/v2/posts') };
+static adapter = { loadMany: (fetch) => fetch('/v2/posts') };
 
 // Envelope + custom method
 static adapter = {
-  async loadAll(fetch, options) {
+  async loadMany(fetch, options) {
     const query = new URLSearchParams(options);
     return (await (await fetch(`/v2/posts?${query}`)).json()).data;
   },
@@ -392,13 +504,24 @@ static adapter = {
   },
 };
 
-await store.loadAll('post', { page: 1 });
-await store.loadAll('post', { page: 2 }); // pages accumulate; existing ids merge
+// Imperative loads (outside data()): a force refresh, or pagination.
+await store.loadMany('post', { page: 1 });
+await store.loadMany('post', { page: 2 }); // pages accumulate; existing ids merge
 const post = store.upsert('post', await store.adapter('post').publish(id));
 ```
 
 Using global `fetch` instead of the supplied parameter is legal and literal:
 it bypasses both `beforeRequest` and fixtures interception.
+
+A custom `loadOne` reports "no such record" by returning a non-OK `Response`
+(`new Response(null, { status: 404 })`) — Puzzle normalizes it into a
+`PuzzleAdapterError`, and on the auto-fetch path that 404 is what becomes the
+committed `null`. Returning `null` instead is a response-shape error, not a
+not-found convention.
+
+The collection verb is `loadMany` (`store.loadMany`, `static adapter.loadMany`,
+`adapter.defaults({ loadMany })`). The 0.6 spelling `loadAll` throws everywhere
+it could appear rather than being silently ignored.
 
 **Record identity ignores number/string spelling.** `findOne('todo', id)` returns
 the same record whether `id` is `7` or `'7'` — which matters constantly, because
@@ -509,8 +632,11 @@ builds.
 
 `<puzzle-skeleton>` is an optional TOP-LEVEL section of a `.pzl` file — a
 sibling of `<puzzle-view>`, not a tag inside it. Its content renders while the
-component's **first `data()`** is pending (async data), then swaps for the real
-template. No loading flag, no API — declare it and Puzzle handles timing.
+component's **first `data()`** is pending — an async `data()`, or a synchronous
+one whose tracked finds are still fetching — then swaps for the real template.
+Every settle round counts as one load, so the skeleton appears once and holds
+until the view commits. No loading flag, no API — declare it and Puzzle handles
+timing.
 
 ```html
 <puzzle-view>…real template…</puzzle-view>
